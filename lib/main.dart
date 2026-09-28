@@ -182,6 +182,19 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     });
   }
 
+  void applyHoursPreset({
+    required String regularHours,
+    required String overtimeHours,
+  }) {
+    regularHoursController.text = regularHours;
+    overtimeHoursController.text = overtimeHours;
+
+    setState(() {
+      regularHoursError = null;
+      overtimeHoursError = null;
+    });
+  }
+
   void clearForm() {
     hourlyRateController.clear();
     regularHoursController.clear();
@@ -273,6 +286,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                     setState(() => hourlyRateError = null);
                                   }
                                 },
+                              ),
+                              const SizedBox(height: 14),
+                              _HoursPresets(
+                                onSelect: applyHoursPreset,
                               ),
                               const SizedBox(height: 14),
                               _PayInputField(
@@ -541,6 +558,61 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _HoursPresets extends StatelessWidget {
+  const _HoursPresets({required this.onSelect});
+
+  final void Function({
+    required String regularHours,
+    required String overtimeHours,
+  }) onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Quick Presets',
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: colorScheme.onSurfaceVariant,
+              ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            ActionChip(
+              label: const Text('Standard 40 Hours'),
+              onPressed: () => onSelect(
+                regularHours: '40',
+                overtimeHours: '0',
+              ),
+            ),
+            ActionChip(
+              label: const Text('40 + 10 OT'),
+              onPressed: () => onSelect(
+                regularHours: '40',
+                overtimeHours: '10',
+              ),
+            ),
+            ActionChip(
+              label: const Text('40 + 20 OT'),
+              onPressed: () => onSelect(
+                regularHours: '40',
+                overtimeHours: '20',
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 }
