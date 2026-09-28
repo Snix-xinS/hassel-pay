@@ -78,10 +78,15 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Paycheck Calculator'),
-        centerTitle: true,
-      ),
+appBar: AppBar(
+  title: const Text(
+    'Paycheck Calculator',
+    style: TextStyle(
+      fontWeight: FontWeight.bold,
+    ),
+  ),
+  centerTitle: true,
+),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),
         child: Column(
