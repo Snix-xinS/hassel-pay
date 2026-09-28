@@ -74,6 +74,25 @@ extension PayPeriodLabel on PayPeriod {
   }
 }
 
+enum FilingStatus {
+  singleOrMarriedFilingSeparately,
+  marriedFilingJointly,
+  headOfHousehold,
+}
+
+extension FilingStatusLabel on FilingStatus {
+  String get label {
+    switch (this) {
+      case FilingStatus.singleOrMarriedFilingSeparately:
+        return 'Single or Married filing separately';
+      case FilingStatus.marriedFilingJointly:
+        return 'Married filing jointly';
+      case FilingStatus.headOfHousehold:
+        return 'Head of household';
+    }
+  }
+}
+
 class PaycheckCalculatorPage extends StatefulWidget {
   const PaycheckCalculatorPage({super.key});
 
@@ -95,6 +114,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   double regularPay = 0;
   double overtimePay = 0;
   PayPeriod selectedPayPeriod = PayPeriod.weekly;
+  FilingStatus selectedFilingStatus =
+      FilingStatus.singleOrMarriedFilingSeparately;
 
   String? hourlyRateError;
   String? regularHoursError;
@@ -206,6 +227,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       regularPay = 0;
       overtimePay = 0;
       selectedPayPeriod = PayPeriod.weekly;
+      selectedFilingStatus = FilingStatus.singleOrMarriedFilingSeparately;
       hourlyRateError = null;
       regularHoursError = null;
       overtimeHoursError = null;
@@ -333,6 +355,22 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 },
                               ),
                             ],
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                        _SectionCard(
+                          title: 'Federal Tax Settings',
+                          subtitle: 'Used later to estimate federal withholding',
+                          child: _FilingStatusSelector(
+                            value: selectedFilingStatus,
+                            onChanged: (filingStatus) {
+                              if (filingStatus == null) {
+                                return;
+                              }
+                              setState(() {
+                                selectedFilingStatus = filingStatus;
+                              });
+                            },
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -667,6 +705,67 @@ class _PayPeriodSelector extends StatelessWidget {
             (payPeriod) => DropdownMenuItem<PayPeriod>(
               value: payPeriod,
               child: Text(payPeriod.label),
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class _FilingStatusSelector extends StatelessWidget {
+  const _FilingStatusSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final FilingStatus value;
+  final ValueChanged<FilingStatus?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DropdownButtonFormField<FilingStatus>(
+      key: ValueKey(value),
+      initialValue: value,
+      isExpanded: true,
+      onChanged: onChanged,
+      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      decoration: InputDecoration(
+        labelText: 'Filing Status',
+        prefixIcon: const Icon(Icons.assignment_ind_outlined, size: 22),
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: colorScheme.primary,
+            width: 1.6,
+          ),
+        ),
+      ),
+      items: FilingStatus.values
+          .map(
+            (status) => DropdownMenuItem<FilingStatus>(
+              value: status,
+              child: Text(
+                status.label,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
           )
           .toList(),
