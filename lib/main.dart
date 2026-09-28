@@ -52,6 +52,28 @@ class PaycheckCalculatorApp extends StatelessWidget {
   }
 }
 
+enum PayPeriod {
+  weekly,
+  biweekly,
+  semimonthly,
+  monthly,
+}
+
+extension PayPeriodLabel on PayPeriod {
+  String get label {
+    switch (this) {
+      case PayPeriod.weekly:
+        return 'Weekly';
+      case PayPeriod.biweekly:
+        return 'Biweekly';
+      case PayPeriod.semimonthly:
+        return 'Semimonthly';
+      case PayPeriod.monthly:
+        return 'Monthly';
+    }
+  }
+}
+
 class PaycheckCalculatorPage extends StatefulWidget {
   const PaycheckCalculatorPage({super.key});
 
@@ -72,6 +94,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   double grossPay = 0;
   double regularPay = 0;
   double overtimePay = 0;
+  PayPeriod selectedPayPeriod = PayPeriod.weekly;
 
   String? hourlyRateError;
   String? regularHoursError;
@@ -169,6 +192,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       grossPay = 0;
       regularPay = 0;
       overtimePay = 0;
+      selectedPayPeriod = PayPeriod.weekly;
       hourlyRateError = null;
       regularHoursError = null;
       overtimeHoursError = null;
@@ -225,6 +249,18 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                           subtitle: 'Enter your pay details for this check',
                           child: Column(
                             children: [
+                              _PayPeriodSelector(
+                                value: selectedPayPeriod,
+                                onChanged: (payPeriod) {
+                                  if (payPeriod == null) {
+                                    return;
+                                  }
+                                  setState(() {
+                                    selectedPayPeriod = payPeriod;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 14),
                               _PayInputField(
                                 controller: hourlyRateController,
                                 label: 'Hourly Rate',
@@ -505,6 +541,63 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+class _PayPeriodSelector extends StatelessWidget {
+  const _PayPeriodSelector({
+    required this.value,
+    required this.onChanged,
+  });
+
+  final PayPeriod value;
+  final ValueChanged<PayPeriod?> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DropdownButtonFormField<PayPeriod>(
+      key: ValueKey(value),
+      initialValue: value,
+      onChanged: onChanged,
+      icon: const Icon(Icons.keyboard_arrow_down_rounded),
+      decoration: InputDecoration(
+        labelText: 'Pay Period',
+        prefixIcon: const Icon(Icons.calendar_month_outlined, size: 22),
+        filled: true,
+        fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 16,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: colorScheme.outlineVariant.withValues(alpha: 0.5),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(
+            color: colorScheme.primary,
+            width: 1.6,
+          ),
+        ),
+      ),
+      items: PayPeriod.values
+          .map(
+            (payPeriod) => DropdownMenuItem<PayPeriod>(
+              value: payPeriod,
+              child: Text(payPeriod.label),
+            ),
+          )
+          .toList(),
     );
   }
 }
