@@ -73,7 +73,69 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   double regularPay = 0;
   double overtimePay = 0;
 
+  String? hourlyRateError;
+  String? regularHoursError;
+  String? overtimeHoursError;
+  String? overtimeMultiplierError;
+
+  String? validateNumberField({
+    required String value,
+    required String fieldLabel,
+  }) {
+    final trimmed = value.trim();
+
+    if (trimmed.isEmpty) {
+      return 'Enter $fieldLabel.';
+    }
+
+    final parsed = double.tryParse(trimmed);
+    if (parsed == null) {
+      return 'Enter a valid number for $fieldLabel.';
+    }
+
+    if (parsed < 0) {
+      return '$fieldLabel cannot be negative.';
+    }
+
+    return null;
+  }
+
+  bool validateInputs() {
+    final nextHourlyRateError = validateNumberField(
+      value: hourlyRateController.text,
+      fieldLabel: 'hourly rate',
+    );
+    final nextRegularHoursError = validateNumberField(
+      value: regularHoursController.text,
+      fieldLabel: 'regular hours',
+    );
+    final nextOvertimeHoursError = validateNumberField(
+      value: overtimeHoursController.text,
+      fieldLabel: 'overtime hours',
+    );
+    final nextOvertimeMultiplierError = validateNumberField(
+      value: overtimeMultiplierController.text,
+      fieldLabel: 'overtime multiplier',
+    );
+
+    setState(() {
+      hourlyRateError = nextHourlyRateError;
+      regularHoursError = nextRegularHoursError;
+      overtimeHoursError = nextOvertimeHoursError;
+      overtimeMultiplierError = nextOvertimeMultiplierError;
+    });
+
+    return nextHourlyRateError == null &&
+        nextRegularHoursError == null &&
+        nextOvertimeHoursError == null &&
+        nextOvertimeMultiplierError == null;
+  }
+
   void calculatePay() {
+    if (!validateInputs()) {
+      return;
+    }
+
     final double hourlyRate =
         double.tryParse(hourlyRateController.text) ?? 0;
 
@@ -107,6 +169,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       grossPay = 0;
       regularPay = 0;
       overtimePay = 0;
+      hourlyRateError = null;
+      regularHoursError = null;
+      overtimeHoursError = null;
+      overtimeMultiplierError = null;
     });
   }
 
@@ -165,6 +231,12 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 hint: '0.00',
                                 prefixText: '\$ ',
                                 icon: Icons.payments_outlined,
+                                errorText: hourlyRateError,
+                                onChanged: (_) {
+                                  if (hourlyRateError != null) {
+                                    setState(() => hourlyRateError = null);
+                                  }
+                                },
                               ),
                               const SizedBox(height: 14),
                               _PayInputField(
@@ -172,6 +244,12 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 label: 'Regular Hours',
                                 hint: '40',
                                 icon: Icons.schedule_outlined,
+                                errorText: regularHoursError,
+                                onChanged: (_) {
+                                  if (regularHoursError != null) {
+                                    setState(() => regularHoursError = null);
+                                  }
+                                },
                               ),
                               const SizedBox(height: 14),
                               _PayInputField(
@@ -179,6 +257,12 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 label: 'Overtime Hours',
                                 hint: '0',
                                 icon: Icons.more_time_outlined,
+                                errorText: overtimeHoursError,
+                                onChanged: (_) {
+                                  if (overtimeHoursError != null) {
+                                    setState(() => overtimeHoursError = null);
+                                  }
+                                },
                               ),
                               const SizedBox(height: 14),
                               _PayInputField(
@@ -186,6 +270,14 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 label: 'Overtime Multiplier',
                                 hint: '1.5',
                                 icon: Icons.trending_up_outlined,
+                                errorText: overtimeMultiplierError,
+                                onChanged: (_) {
+                                  if (overtimeMultiplierError != null) {
+                                    setState(
+                                      () => overtimeMultiplierError = null,
+                                    );
+                                  }
+                                },
                               ),
                             ],
                           ),
@@ -424,6 +516,8 @@ class _PayInputField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.prefixText,
+    this.errorText,
+    this.onChanged,
   });
 
   final TextEditingController controller;
@@ -431,13 +525,23 @@ class _PayInputField extends StatelessWidget {
   final String hint;
   final IconData icon;
   final String? prefixText;
+  final String? errorText;
+  final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final errorBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(16),
+      borderSide: BorderSide(
+        color: colorScheme.error,
+        width: 1.6,
+      ),
+    );
 
     return TextField(
       controller: controller,
+      onChanged: onChanged,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
       style: const TextStyle(
         fontSize: 16,
@@ -448,6 +552,8 @@ class _PayInputField extends StatelessWidget {
         hintText: hint,
         prefixText: prefixText,
         prefixIcon: Icon(icon, size: 22),
+        errorText: errorText,
+        errorMaxLines: 2,
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
         contentPadding: const EdgeInsets.symmetric(
@@ -471,6 +577,8 @@ class _PayInputField extends StatelessWidget {
             width: 1.6,
           ),
         ),
+        errorBorder: errorBorder,
+        focusedErrorBorder: errorBorder,
       ),
     );
   }
