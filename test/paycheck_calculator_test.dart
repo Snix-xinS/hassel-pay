@@ -144,10 +144,12 @@ void main() {
     expect(find.text('\$0.00'), findsNWidgets(4));
   });
 
-  testWidgets('tax estimate marks an unselected state and Clear removes it', (
+  testWidgets('Texas is the default state and Clear restores it', (
     tester,
   ) async {
     await tester.pumpWidget(const PaycheckCalculatorApp());
+    expect(find.text('PAYCHECK & TAKE-HOME CALCULATOR'), findsOneWidget);
+    expect(find.text('Texas'), findsOneWidget);
     await tester.enterText(find.byType(EditableText).at(0), '20');
     await tester.enterText(find.byType(EditableText).at(1), '40');
     await tester.enterText(find.byType(EditableText).at(2), '0');
@@ -155,15 +157,25 @@ void main() {
     await tester.tap(find.text('Calculate Pay'));
     await tester.pumpAndSettle();
     expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsOneWidget);
+    expect(find.text('ESTIMATED TAKE-HOME'), findsOneWidget);
     expect(
       find.textContaining('Estimated take-home unavailable'),
-      findsOneWidget,
+      findsNothing,
     );
 
     await tester.ensureVisible(find.text('Clear'));
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
     expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
+    expect(find.text('Texas'), findsOneWidget);
+  });
+
+  testWidgets('Hassel header has no theme control', (tester) async {
+    await tester.pumpWidget(const PaycheckCalculatorApp());
+    expect(find.text('PAYCHECK & TAKE-HOME CALCULATOR'), findsOneWidget);
+    expect(find.byType(IconButton), findsNothing);
+    expect(find.byTooltip('Switch to light theme'), findsNothing);
+    expect(find.byTooltip('Switch to dark theme'), findsNothing);
   });
 
   testWidgets('qualified overtime controls invalidate and display estimate', (
@@ -201,6 +213,13 @@ void main() {
       find.text('Qualified overtime Step 4(b) estimate (annual)'),
       findsOneWidget,
     );
+    expect(
+      find.textContaining('this paycheck amount is not automatically assumed'),
+      findsOneWidget,
+    );
+    await tester.ensureVisible(find.text('How we estimated this'));
+    await tester.tap(find.text('How we estimated this'));
+    await tester.pumpAndSettle();
     expect(
       find.textContaining('overtime being required under'),
       findsOneWidget,

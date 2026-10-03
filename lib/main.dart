@@ -16,46 +16,85 @@ class PaycheckCalculatorApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF0F766E);
-
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Paycheck Calculator',
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: seed,
-          brightness: Brightness.light,
-        ),
-        scaffoldBackgroundColor: const Color(0xFFF3F6F8),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-            minimumSize: const Size.fromHeight(54),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-            minimumSize: const Size.fromHeight(54),
-            textStyle: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-            ),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-            ),
-          ),
-        ),
-      ),
+      title: 'Hassel Pay',
+      theme: _hasselTheme(Brightness.light),
+      darkTheme: _hasselTheme(Brightness.dark),
+      themeMode: ThemeMode.dark,
       home: const PaycheckCalculatorPage(),
     );
   }
+}
+
+ThemeData _hasselTheme(Brightness brightness) {
+  const backgroundDark = Color(0xFF0B1220);
+  const surfaceDark = Color(0xFF111827);
+  const green = Color(0xFF22CC5E);
+  const emerald = Color(0xFF10B981);
+  const blue = Color(0xFF2563EB);
+  const primaryTextDark = Color(0xFFE5E7EB);
+  const secondaryTextDark = Color(0xFF94A3B8);
+  final isDark = brightness == Brightness.dark;
+  final colorScheme =
+      ColorScheme.fromSeed(seedColor: green, brightness: brightness).copyWith(
+        primary: green,
+        onPrimary: const Color(0xFF06120A),
+        primaryContainer: isDark
+            ? const Color(0xFF123222)
+            : const Color(0xFFDDF7E5),
+        onPrimaryContainer: isDark
+            ? const Color(0xFFD9FBE4)
+            : const Color(0xFF14532D),
+        secondary: emerald,
+        onSecondary: const Color(0xFF061510),
+        tertiary: blue,
+        surface: isDark ? surfaceDark : const Color(0xFFFFFFFF),
+        onSurface: isDark ? primaryTextDark : const Color(0xFF0F172A),
+        onSurfaceVariant: isDark ? secondaryTextDark : const Color(0xFF475569),
+        outline: isDark ? const Color(0xFF334155) : const Color(0xFFCBD5E1),
+        outlineVariant: isDark
+            ? const Color(0xFF263449)
+            : const Color(0xFFE2E8F0),
+        surfaceContainerHighest: isDark
+            ? const Color(0xFF1B2638)
+            : const Color(0xFFF1F5F9),
+      );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: colorScheme,
+    scaffoldBackgroundColor: isDark ? backgroundDark : const Color(0xFFF8FAFC),
+    dividerColor: colorScheme.outlineVariant,
+    inputDecorationTheme: InputDecorationTheme(
+      labelStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      hintStyle: TextStyle(
+        color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+      ),
+      prefixStyle: TextStyle(color: colorScheme.onSurfaceVariant),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(13),
+        borderSide: const BorderSide(color: green, width: 1.5),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        backgroundColor: green,
+        foregroundColor: const Color(0xFF06120A),
+        minimumSize: const Size.fromHeight(56),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        foregroundColor: colorScheme.onSurface,
+        minimumSize: const Size.fromHeight(56),
+        textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        side: BorderSide(color: colorScheme.outline),
+      ),
+    ),
+  );
 }
 
 enum FilingStatus {
@@ -118,7 +157,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   PayPeriod selectedPayPeriod = PayPeriod.weekly;
   FilingStatus selectedFilingStatus =
       FilingStatus.singleOrMarriedFilingSeparately;
-  tax.StateCode selectedState = tax.StateCode.notSelected;
+  tax.StateCode selectedState = tax.StateCode.texas;
   bool step2Checked = false;
   bool qualifiedOvertimeSelected = false;
   bool overtimeMarriedFilingSeparately = false;
@@ -292,7 +331,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       regularHoursError = null;
       overtimeHoursError = null;
       overtimeMultiplierError = null;
-      selectedState = tax.StateCode.notSelected;
+      selectedState = tax.StateCode.texas;
       step2Checked = false;
       qualifiedOvertimeSelected = false;
       overtimeMarriedFilingSeparately = false;
@@ -324,15 +363,17 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     final horizontalPadding = media.size.width >= 720 ? 32.0 : 20.0;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
-      value: SystemUiOverlayStyle.dark.copyWith(
-        statusBarColor: Colors.transparent,
-      ),
+      value:
+          (Theme.of(context).brightness == Brightness.dark
+                  ? SystemUiOverlayStyle.light
+                  : SystemUiOverlayStyle.dark)
+              .copyWith(statusBarColor: Colors.transparent),
       child: Scaffold(
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxContentWidth = constraints.maxWidth > 560
-                  ? 520.0
+              final maxContentWidth = constraints.maxWidth > 760
+                  ? 720.0
                   : constraints.maxWidth;
 
               return Align(
@@ -342,7 +383,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                   child: SingleChildScrollView(
                     padding: EdgeInsets.fromLTRB(
                       horizontalPadding,
-                      12,
+                      20,
                       horizontalPadding,
                       28,
                     ),
@@ -350,7 +391,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         const _AppHeader(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 28),
                         _GrossPayHero(
                           amount: result?.grossPay ?? 0,
                           payPeriod: selectedPayPeriod,
@@ -377,7 +418,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: hourlyRateController,
-                                label: 'Hourly Rate',
+                                label: 'Hourly rate',
                                 hint: '0.00',
                                 prefixText: '\$ ',
                                 icon: Icons.payments_outlined,
@@ -395,8 +436,9 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: regularHoursController,
-                                label: 'Regular Hours',
+                                label: 'Regular hours',
                                 hint: '40',
+                                suffixText: 'hrs',
                                 icon: Icons.schedule_outlined,
                                 errorText: regularHoursError,
                                 onChanged: (_) {
@@ -410,8 +452,9 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: overtimeHoursController,
-                                label: 'Overtime Hours',
+                                label: 'Overtime hours',
                                 hint: '0',
+                                suffixText: 'hrs',
                                 icon: Icons.more_time_outlined,
                                 errorText: overtimeHoursError,
                                 onChanged: (_) {
@@ -425,8 +468,9 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: overtimeMultiplierController,
-                                label: 'Overtime Multiplier',
+                                label: 'Overtime multiplier',
                                 hint: '1.5',
+                                suffixText: '×',
                                 icon: Icons.trending_up_outlined,
                                 errorText: overtimeMultiplierError,
                                 onChanged: (_) {
@@ -542,26 +586,6 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                       label: 'Step 4(c) extra per paycheck',
                                       onChanged: (_) => clearTaxResult(),
                                     ),
-                                    DropdownButtonFormField<tax.StateCode>(
-                                      initialValue: selectedState,
-                                      isExpanded: true,
-                                      decoration: const InputDecoration(
-                                        labelText: 'State',
-                                      ),
-                                      items: tax.StateCode.values
-                                          .map(
-                                            (state) => DropdownMenuItem(
-                                              value: state,
-                                              child: Text(state.label),
-                                            ),
-                                          )
-                                          .toList(),
-                                      onChanged: (value) => setState(() {
-                                        selectedState =
-                                            value ?? tax.StateCode.notSelected;
-                                        taxResult = null;
-                                      }),
-                                    ),
                                     const SizedBox(height: 8),
                                     _TaxAmountField(
                                       controller: socialSecurityYtdController,
@@ -592,6 +616,26 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                     ),
                                   ],
                                 ),
+                              ),
+                              const SizedBox(height: 10),
+                              DropdownButtonFormField<tax.StateCode>(
+                                initialValue: selectedState,
+                                isExpanded: true,
+                                decoration: const InputDecoration(
+                                  labelText: 'State',
+                                ),
+                                items: tax.StateCode.values
+                                    .map(
+                                      (state) => DropdownMenuItem(
+                                        value: state,
+                                        child: Text(state.label),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) => setState(() {
+                                  selectedState = value ?? tax.StateCode.texas;
+                                  taxResult = null;
+                                }),
                               ),
                             ],
                           ),
@@ -652,6 +696,11 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 'Estimated paycheck withholding — not a final tax calculation.',
                             child: Column(
                               children: [
+                                _TakeHomeHero(
+                                  amountCents:
+                                      taxResult!.estimatedTakeHomePayCents,
+                                ),
+                                const SizedBox(height: 17),
                                 _TaxResultRow(
                                   label: 'Gross Pay',
                                   cents: taxResult!.grossPayCents,
@@ -675,6 +724,19 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   cents: taxResult!
                                       .qualifiedOvertime
                                       .annualDeductionCents,
+                                ),
+                                const Padding(
+                                  padding: EdgeInsets.only(bottom: 10),
+                                  child: Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(
+                                      'Potential qualified overtime is an estimate for this check. The annual Step 4(b) estimate is separate; this paycheck amount is not automatically assumed to be deductible.',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
                                 ),
                                 _TaxResultRow(
                                   label: 'Federal Income Tax',
@@ -713,31 +775,42 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   cents: taxResult!.totalWithholdingCents,
                                   bold: true,
                                 ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  taxResult!.estimatedTakeHomePayCents == null
-                                      ? 'Estimated take-home unavailable until a supported state is selected.'
-                                      : 'ESTIMATED TAKE-HOME\n\$${(taxResult!.estimatedTakeHomePayCents! / 100).toStringAsFixed(2)}',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    fontSize: 20,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                ...taxResult!.warnings.map(
-                                  (warning) => Padding(
-                                    padding: const EdgeInsets.only(top: 4),
-                                    child: Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: Text(
-                                        '• $warning',
-                                        style: const TextStyle(fontSize: 12),
+                                const SizedBox(height: 5),
+                                if (taxResult!.warnings.isNotEmpty)
+                                  Material(
+                                    color: Colors.transparent,
+                                    child: ExpansionTile(
+                                      tilePadding: EdgeInsets.zero,
+                                      childrenPadding: const EdgeInsets.only(
+                                        bottom: 8,
                                       ),
+                                      title: const Text(
+                                        'How we estimated this',
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                      children: taxResult!.warnings
+                                          .map(
+                                            (warning) => Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: 4,
+                                              ),
+                                              child: Align(
+                                                alignment: Alignment.centerLeft,
+                                                child: Text(
+                                                  '• $warning',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                  ),
+                                                ),
+                                              ),
+                                            ),
+                                          )
+                                          .toList(),
                                     ),
                                   ),
-                                ),
                               ],
                             ),
                           ),
@@ -760,42 +833,37 @@ class _AppHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 48,
-          height: 48,
-          decoration: BoxDecoration(
-            color: colorScheme.primaryContainer,
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Icon(
-            Icons.account_balance_wallet_outlined,
-            color: colorScheme.onPrimaryContainer,
-          ),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+        RichText(
+          text: const TextSpan(
+            style: TextStyle(
+              fontSize: 32,
+              fontWeight: FontWeight.w700,
+              letterSpacing: -0.7,
+              height: 1.1,
+            ),
             children: [
-              Text(
-                'Paycheck Calculator',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
-                ),
+              TextSpan(
+                text: 'Hassel ',
+                style: TextStyle(color: Color(0xFFE5E7EB)),
               ),
-              const SizedBox(height: 2),
-              Text(
-                'Estimate your gross pay in seconds.',
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              TextSpan(
+                text: 'Pay',
+                style: TextStyle(color: Color(0xFF22CC5E)),
               ),
             ],
+          ),
+        ),
+        const SizedBox(height: 4),
+        const Text(
+          'PAYCHECK & TAKE-HOME CALCULATOR',
+          style: TextStyle(
+            color: Color(0xFF94A3B8),
+            fontSize: 10,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 1.05,
           ),
         ),
       ],
@@ -812,28 +880,15 @@ class _GrossPayHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(22, 24, 22, 26),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 21),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            colorScheme.primary,
-            colorScheme.primary.withValues(alpha: 0.82),
-            colorScheme.tertiary,
-          ],
-        ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: colorScheme.primary.withValues(alpha: 0.28),
-            blurRadius: 24,
-            offset: const Offset(0, 12),
-          ),
-        ],
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -841,7 +896,7 @@ class _GrossPayHero extends StatelessWidget {
           Text(
             'GROSS PAY - ${payPeriod.label.toUpperCase()}',
             style: TextStyle(
-              color: colorScheme.onPrimary.withValues(alpha: 0.82),
+              color: isDark ? colorScheme.primary : const Color(0xFF13863F),
               fontSize: 12,
               fontWeight: FontWeight.w700,
               letterSpacing: 1.4,
@@ -854,7 +909,7 @@ class _GrossPayHero extends StatelessWidget {
             child: Text(
               '\$${amount.toStringAsFixed(2)}',
               style: TextStyle(
-                color: colorScheme.onPrimary,
+                color: colorScheme.onSurface,
                 fontSize: 44,
                 fontWeight: FontWeight.w800,
                 height: 1.05,
@@ -865,10 +920,7 @@ class _GrossPayHero extends StatelessWidget {
           const SizedBox(height: 8),
           Text(
             'Before taxes and deductions',
-            style: TextStyle(
-              color: colorScheme.onPrimary.withValues(alpha: 0.8),
-              fontSize: 13,
-            ),
+            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
           ),
         ],
       ),
@@ -896,17 +948,10 @@ class _SectionCard extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 20),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: colorScheme.outlineVariant.withValues(alpha: 0.45),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -963,16 +1008,34 @@ class _HoursPresets extends StatelessWidget {
             ActionChip(
               label: const Text('Standard 40 Hours'),
               onPressed: () => onSelect(regularHours: '40', overtimeHours: '0'),
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              side: BorderSide(color: colorScheme.outlineVariant),
+              labelStyle: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             ActionChip(
               label: const Text('40 + 10 OT'),
               onPressed: () =>
                   onSelect(regularHours: '40', overtimeHours: '10'),
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              side: BorderSide(color: colorScheme.outlineVariant),
+              labelStyle: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             ActionChip(
               label: const Text('40 + 20 OT'),
               onPressed: () =>
                   onSelect(regularHours: '40', overtimeHours: '20'),
+              backgroundColor: colorScheme.surfaceContainerHighest,
+              side: BorderSide(color: colorScheme.outlineVariant),
+              labelStyle: TextStyle(
+                color: colorScheme.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ],
         ),
@@ -990,6 +1053,9 @@ class _PayPeriodSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final focusColor = Theme.of(context).brightness == Brightness.dark
+        ? colorScheme.primary
+        : const Color(0xFF13863F);
 
     return DropdownButtonFormField<PayPeriod>(
       key: ValueKey(value),
@@ -1017,7 +1083,7 @@ class _PayPeriodSelector extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+          borderSide: BorderSide(color: focusColor, width: 1.6),
         ),
       ),
       items: PayPeriod.values
@@ -1041,6 +1107,9 @@ class _FilingStatusSelector extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final focusColor = Theme.of(context).brightness == Brightness.dark
+        ? colorScheme.primary
+        : const Color(0xFF13863F);
 
     return DropdownButtonFormField<FilingStatus>(
       key: ValueKey(value),
@@ -1069,7 +1138,7 @@ class _FilingStatusSelector extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+          borderSide: BorderSide(color: focusColor, width: 1.6),
         ),
       ),
       items: FilingStatus.values
@@ -1091,6 +1160,7 @@ class _PayInputField extends StatelessWidget {
     required this.hint,
     required this.icon,
     this.prefixText,
+    this.suffixText,
     this.errorText,
     this.onChanged,
   });
@@ -1100,12 +1170,16 @@ class _PayInputField extends StatelessWidget {
   final String hint;
   final IconData icon;
   final String? prefixText;
+  final String? suffixText;
   final String? errorText;
   final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final focusColor = Theme.of(context).brightness == Brightness.dark
+        ? colorScheme.primary
+        : const Color(0xFF13863F);
     final errorBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
       borderSide: BorderSide(color: colorScheme.error, width: 1.6),
@@ -1120,6 +1194,7 @@ class _PayInputField extends StatelessWidget {
         labelText: label,
         hintText: hint,
         prefixText: prefixText,
+        suffixText: suffixText,
         prefixIcon: Icon(icon, size: 22),
         errorText: errorText,
         errorMaxLines: 2,
@@ -1141,7 +1216,7 @@ class _PayInputField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+          borderSide: BorderSide(color: focusColor, width: 1.6),
         ),
         errorBorder: errorBorder,
         focusedErrorBorder: errorBorder,
@@ -1210,12 +1285,8 @@ class _BreakdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.4),
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 9),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
@@ -1263,6 +1334,66 @@ class _TaxAmountField extends StatelessWidget {
       ),
     ),
   );
+}
+
+class _TakeHomeHero extends StatelessWidget {
+  const _TakeHomeHero({required this.amountCents});
+
+  final int? amountCents;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(17, 16, 17, 17),
+      decoration: BoxDecoration(
+        color: colors.primaryContainer,
+        borderRadius: BorderRadius.circular(15),
+        border: Border.all(color: colors.primary.withValues(alpha: 0.55)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'ESTIMATED TAKE-HOME',
+            style: TextStyle(
+              color: isDark ? colors.primary : colors.onPrimaryContainer,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 1.25,
+            ),
+          ),
+          const SizedBox(height: 5),
+          if (amountCents == null)
+            Text(
+              'Estimated take-home unavailable until a supported state is selected.',
+              style: TextStyle(
+                color: colors.onSurfaceVariant,
+                fontSize: 14,
+                height: 1.4,
+              ),
+            )
+          else
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '\$${(amountCents! / 100).toStringAsFixed(2)}',
+                style: TextStyle(
+                  color: colors.onPrimaryContainer,
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -1.2,
+                  height: 1.15,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
 }
 
 class _TaxResultRow extends StatelessWidget {
