@@ -43,6 +43,11 @@ class TaxYearConfig {
   int get medicareRateBasisPoints => 145;
   int get additionalMedicareRateBasisPoints => 90;
   int get additionalMedicareWithholdingThresholdCents => 20000000;
+  int get qualifiedOvertimeIndividualLimitCents => 1250000;
+  int get qualifiedOvertimeJointLimitCents => 2500000;
+  int get qualifiedOvertimeIndividualMagiThresholdCents => 15000000;
+  int get qualifiedOvertimeJointMagiThresholdCents => 30000000;
+  int get qualifiedOvertimePhaseoutPerThousandCents => 10000;
 
   /// Calculates employee tax in cents, rounded half up to one cent.
   int withholdingCents(int taxableWagesCents, int rateBasisPoints) {

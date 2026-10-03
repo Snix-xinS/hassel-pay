@@ -20,6 +20,7 @@ PayrollInputs input({
   double step4b = 0,
   double step4c = 0,
   double otherDeduction = 0,
+  QualifiedOvertimeInputs? qualifiedOvertime,
 }) => PayrollInputs.fromDollars(
   grossPay: gross,
   state: state,
@@ -33,6 +34,7 @@ PayrollInputs input({
   step4bAnnual: step4b,
   step4cPerPaycheck: step4c,
   otherCashDeductions: otherDeduction,
+  qualifiedOvertime: qualifiedOvertime,
 );
 
 void main() {
@@ -199,18 +201,28 @@ void main() {
       expect(result.otherDeductionsCents, 0);
     });
 
-    test('federal exemption suppresses W-4 withholding settings', () {
-      final exemptInputs = PayrollInputs.fromDollars(
-        grossPay: 1000,
-        filingStatus: FederalFilingStatus.singleOrMarriedFilingSeparately,
-        payFrequency: PayFrequency.weekly,
-        state: StateCode.texas,
-        step4cPerPaycheck: 50,
-        exemptFromFederalWithholding: true,
+    test('qualified overtime changes federal withholding, not FICA wages', () {
+      final inputs = input(
+        qualifiedOvertime: QualifiedOvertimeInputs(
+          overtimeCompensationCents: 37500,
+          regularRateCents: 2500,
+          overtimeHoursThousandths: 10000,
+          overtimeMultiplierThousandths: 1500,
+          treatAsFlsaQualified: true,
+          estimatedMagiCents: 5000000,
+        ),
       );
-      final result = service.calculate(exemptInputs);
-      expect(result.federalIncomeTaxCents, 0);
-      expect(result.warnings, contains(contains('eligibility')));
+      final result = service.calculate(inputs);
+      expect(
+        result.qualifiedOvertime.potentialQualifiedOvertimePerPaycheckCents,
+        12500,
+      );
+      expect(
+        result.federalIncomeTaxCents,
+        lessThan(service.calculate(input()).federalIncomeTaxCents),
+      );
+      expect(result.socialSecurityCents, 6200);
+      expect(result.medicareCents, 1450);
     });
   });
 

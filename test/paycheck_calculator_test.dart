@@ -165,4 +165,61 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
   });
+
+  testWidgets('qualified overtime controls invalidate and display estimate', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const PaycheckCalculatorApp());
+    await tester.enterText(find.byType(EditableText).at(0), '25');
+    await tester.enterText(find.byType(EditableText).at(1), '40');
+    await tester.enterText(find.byType(EditableText).at(2), '10');
+    await tester.ensureVisible(find.text('Treat overtime as FLSA-qualified'));
+    await tester.tap(find.text('Treat overtime as FLSA-qualified'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.text('W-4 adjustments and payroll details'),
+    );
+    await tester.tap(find.text('W-4 adjustments and payroll details'));
+    await tester.pumpAndSettle();
+    final magiField = find.byWidgetPredicate(
+      (widget) =>
+          widget is TextField &&
+          widget.decoration?.labelText ==
+              'Estimated 2026 MAGI for overtime phaseout',
+    );
+    await tester.ensureVisible(magiField);
+    await tester.enterText(magiField, '50000');
+    await tester.ensureVisible(find.text('Calculate Pay'));
+    await tester.tap(find.text('Calculate Pay'));
+    await tester.pumpAndSettle();
+    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsOneWidget);
+    expect(
+      find.text('Potential qualified overtime (this check)'),
+      findsOneWidget,
+    );
+    expect(
+      find.text('Qualified overtime Step 4(b) estimate (annual)'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('overtime being required under'),
+      findsOneWidget,
+    );
+
+    await tester.enterText(magiField, '60000');
+    await tester.pumpAndSettle();
+    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
+
+    await tester.ensureVisible(find.text('Clear'));
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text('Treat overtime as FLSA-qualified'), findsOneWidget);
+    final switchControl = tester.widget<SwitchListTile>(
+      find.ancestor(
+        of: find.text('Treat overtime as FLSA-qualified'),
+        matching: find.byType(SwitchListTile),
+      ),
+    );
+    expect(switchControl.value, isFalse);
+  });
 }

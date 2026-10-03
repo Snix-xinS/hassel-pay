@@ -1,4 +1,5 @@
 import 'state/state_tax_provider.dart';
+import 'qualified_overtime_calculator.dart';
 
 class PaycheckTaxResult {
   const PaycheckTaxResult({
@@ -14,6 +15,7 @@ class PaycheckTaxResult {
     required this.totalWithholdingCents,
     required this.estimatedTakeHomePayCents,
     required this.warnings,
+    required this.qualifiedOvertime,
   });
 
   final int taxYear;
@@ -33,4 +35,5 @@ class PaycheckTaxResult {
   /// Null if state is unselected or unsupported, avoiding a misleading net.
   final int? estimatedTakeHomePayCents;
   final List<String> warnings;
+  final QualifiedOvertimeResult qualifiedOvertime;
 }

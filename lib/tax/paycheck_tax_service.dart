@@ -2,6 +2,7 @@ import 'federal_withholding.dart';
 import 'fica_calculator.dart';
 import 'paycheck_result.dart';
 import 'payroll_inputs.dart';
+import 'qualified_overtime_calculator.dart';
 import 'state/state_tax_provider.dart';
 import 'state/texas_provider.dart';
 import 'tax_year_config.dart';
@@ -12,16 +13,27 @@ class PaycheckTaxService {
     this.config = TaxYearConfig.taxYear2026,
     this.federalCalculator = const FederalWithholdingCalculator(),
     this.ficaCalculator = const FicaCalculator(),
+    this.qualifiedOvertimeCalculator = const QualifiedOvertimeCalculator(),
     this.stateProviders = const [TexasStateTaxProvider()],
   });
 
   final TaxYearConfig config;
   final FederalWithholdingCalculator federalCalculator;
   final FicaCalculator ficaCalculator;
+  final QualifiedOvertimeCalculator qualifiedOvertimeCalculator;
   final List<StateTaxProvider> stateProviders;
 
   PaycheckTaxResult calculate(PayrollInputs inputs) {
-    final federal = federalCalculator.calculate(inputs);
+    final qualifiedOvertime = qualifiedOvertimeCalculator.calculate(
+      inputs: inputs.qualifiedOvertime,
+      payFrequency: inputs.payFrequency,
+      filingStatus: inputs.filingStatus,
+    );
+    final federal = federalCalculator.calculate(
+      inputs,
+      qualifiedOvertimeStep4bAnnualCents:
+          qualifiedOvertime.annualDeductionCents,
+    );
     final fica = ficaCalculator.calculate(inputs);
     final wages =
         inputs.taxableWageBases ??
@@ -72,14 +84,12 @@ class PaycheckTaxService {
       ...federal.assumptions,
       ...fica.assumptions,
       ...stateResult.assumptions,
+      ...qualifiedOvertime.warnings,
       'Pre-tax deductions are not modeled; gross pay is used for wage bases unless explicitly provided.',
+      'Actual employer withholding can differ from this estimate; final federal tax liability is determined when filing a tax return.',
       'Multiple jobs are represented only by the W-4 Step 2 checkbox; prior-employer wages, bonuses, irregular pay, special payroll arrangements, and final tax liability are not modeled.',
+      'Qualified overtime from a spouse or other employers is not included in the overtime deduction estimate.',
     ];
-    if (inputs.exemptFromFederalWithholding) {
-      warnings.add(
-        'Federal exemption eligibility is user-attested and is not verified.',
-      );
-    }
 
     return PaycheckTaxResult(
       taxYear: config.taxYear,
@@ -96,6 +106,7 @@ class PaycheckTaxService {
           ? inputs.grossPayCents - total
           : null,
       warnings: warnings,
+      qualifiedOvertime: qualifiedOvertime,
     );
   }
 }

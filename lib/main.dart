@@ -103,6 +103,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   final TextEditingController step4cController = TextEditingController(
     text: '0',
   );
+  final TextEditingController qualifiedOvertimeMagiController =
+      TextEditingController();
   final TextEditingController socialSecurityYtdController =
       TextEditingController();
   final TextEditingController medicareYtdController = TextEditingController();
@@ -118,7 +120,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       FilingStatus.singleOrMarriedFilingSeparately;
   tax.StateCode selectedState = tax.StateCode.notSelected;
   bool step2Checked = false;
-  bool federalExempt = false;
+  bool qualifiedOvertimeSelected = false;
+  bool overtimeMarriedFilingSeparately = false;
   String? taxInputError;
 
   String? hourlyRateError;
@@ -160,6 +163,31 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       );
       final calculated = calculator.calculate(inputs);
       grossResult = calculated;
+      final estimatedMagi = qualifiedOvertimeSelected
+          ? _optionalMoney(qualifiedOvertimeMagiController.text)
+          : null;
+      final isMfs =
+          selectedFilingStatus ==
+              FilingStatus.singleOrMarriedFilingSeparately &&
+          overtimeMarriedFilingSeparately;
+      final overtimeInputs = tax.QualifiedOvertimeInputs(
+        overtimeCompensationCents: tax.PayrollInputs.dollarsToCents(
+          calculated.overtimePay,
+          'overtime compensation',
+        ),
+        regularRateCents: tax.PayrollInputs.dollarsToCents(
+          inputs.hourlyRate,
+          'regular rate',
+        ),
+        overtimeHoursThousandths: (inputs.overtimeHours * 1000).round(),
+        overtimeMultiplierThousandths: (inputs.overtimeMultiplier * 1000)
+            .round(),
+        treatAsFlsaQualified: qualifiedOvertimeSelected,
+        marriedFilingSeparately: isMfs,
+        estimatedMagiCents: estimatedMagi == null
+            ? null
+            : tax.PayrollInputs.dollarsToCents(estimatedMagi, 'estimated MAGI'),
+      );
       final taxInputs = tax.PayrollInputs.fromDollars(
         grossPay: calculated.grossPay,
         filingStatus: switch (selectedFilingStatus) {
@@ -187,7 +215,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
         step4bAnnual: _money(step4bController.text),
         step4cPerPaycheck: _money(step4cController.text),
         otherCashDeductions: _money(otherDeductionsController.text),
-        exemptFromFederalWithholding: federalExempt,
+        qualifiedOvertime: overtimeInputs,
       );
       final calculatedTax = taxService.calculate(taxInputs);
       setState(() {
@@ -250,6 +278,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     step4aController.text = '0';
     step4bController.text = '0';
     step4cController.text = '0';
+    qualifiedOvertimeMagiController.clear();
     socialSecurityYtdController.clear();
     medicareYtdController.clear();
     otherDeductionsController.text = '0';
@@ -265,7 +294,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       overtimeMultiplierError = null;
       selectedState = tax.StateCode.notSelected;
       step2Checked = false;
-      federalExempt = false;
+      qualifiedOvertimeSelected = false;
+      overtimeMarriedFilingSeparately = false;
       taxInputError = null;
     });
   }
@@ -280,6 +310,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     step4aController.dispose();
     step4bController.dispose();
     step4cController.dispose();
+    qualifiedOvertimeMagiController.dispose();
     socialSecurityYtdController.dispose();
     medicareYtdController.dispose();
     otherDeductionsController.dispose();
@@ -406,6 +437,23 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   });
                                 },
                               ),
+                              Material(
+                                color: Colors.transparent,
+                                child: SwitchListTile(
+                                  contentPadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'Treat overtime as FLSA-qualified',
+                                  ),
+                                  subtitle: const Text(
+                                    'Only the premium above your regular rate may qualify (usually 0.5×). Eligibility depends on FLSA rules.',
+                                  ),
+                                  value: qualifiedOvertimeSelected,
+                                  onChanged: (value) => setState(() {
+                                    qualifiedOvertimeSelected = value;
+                                    taxResult = null;
+                                  }),
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -457,27 +505,42 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                     ),
                                     _TaxAmountField(
                                       controller: step4bController,
-                                      label: 'Step 4(b) annual deductions',
+                                      label:
+                                          'Other Step 4(b) deductions (annual)',
                                       onChanged: (_) => clearTaxResult(),
                                     ),
+                                    if (qualifiedOvertimeSelected) ...[
+                                      _TaxAmountField(
+                                        controller:
+                                            qualifiedOvertimeMagiController,
+                                        label:
+                                            'Estimated 2026 MAGI for overtime phaseout',
+                                        onChanged: (_) => clearTaxResult(),
+                                      ),
+                                      if (selectedFilingStatus ==
+                                          FilingStatus
+                                              .singleOrMarriedFilingSeparately)
+                                        SwitchListTile(
+                                          contentPadding: EdgeInsets.zero,
+                                          title: const Text(
+                                            'I file married filing separately',
+                                          ),
+                                          subtitle: const Text(
+                                            'Married taxpayers must file jointly for this deduction.',
+                                          ),
+                                          value:
+                                              overtimeMarriedFilingSeparately,
+                                          onChanged: (value) => setState(() {
+                                            overtimeMarriedFilingSeparately =
+                                                value;
+                                            taxResult = null;
+                                          }),
+                                        ),
+                                    ],
                                     _TaxAmountField(
                                       controller: step4cController,
                                       label: 'Step 4(c) extra per paycheck',
                                       onChanged: (_) => clearTaxResult(),
-                                    ),
-                                    SwitchListTile(
-                                      contentPadding: EdgeInsets.zero,
-                                      title: const Text(
-                                        'Claim exempt from federal withholding',
-                                      ),
-                                      subtitle: const Text(
-                                        'Only if you had no federal income-tax liability last year and expect none this year.',
-                                      ),
-                                      value: federalExempt,
-                                      onChanged: (value) => setState(() {
-                                        federalExempt = value;
-                                        taxResult = null;
-                                      }),
                                     ),
                                     DropdownButtonFormField<tax.StateCode>(
                                       initialValue: selectedState,
@@ -523,7 +586,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                         vertical: 8,
                                       ),
                                       child: Text(
-                                        'Pre-tax deductions are not modeled. Federal exemption eligibility is not verified.',
+                                        'Pre-tax deductions are not modeled. Qualified overtime eligibility is user-attested and not verified.',
                                         style: TextStyle(fontSize: 12),
                                       ),
                                     ),
@@ -592,6 +655,26 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 _TaxResultRow(
                                   label: 'Gross Pay',
                                   cents: taxResult!.grossPayCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'Total overtime compensation',
+                                  cents: taxResult!
+                                      .qualifiedOvertime
+                                      .overtimeCompensationCents,
+                                ),
+                                _TaxResultRow(
+                                  label:
+                                      'Potential qualified overtime (this check)',
+                                  cents: taxResult!
+                                      .qualifiedOvertime
+                                      .potentialQualifiedOvertimePerPaycheckCents,
+                                ),
+                                _TaxResultRow(
+                                  label:
+                                      'Qualified overtime Step 4(b) estimate (annual)',
+                                  cents: taxResult!
+                                      .qualifiedOvertime
+                                      .annualDeductionCents,
                                 ),
                                 _TaxResultRow(
                                   label: 'Federal Income Tax',

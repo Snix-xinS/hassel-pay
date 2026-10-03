@@ -17,6 +17,63 @@ enum FederalFilingStatus {
   headOfHousehold,
 }
 
+/// User-provided facts used to estimate the qualified overtime deduction.
+/// Hours use thousandths to avoid floating point in the deduction engine.
+class QualifiedOvertimeInputs {
+  QualifiedOvertimeInputs({
+    required this.overtimeCompensationCents,
+    required this.regularRateCents,
+    required this.overtimeHoursThousandths,
+    required this.overtimeMultiplierThousandths,
+    this.treatAsFlsaQualified = false,
+    this.marriedFilingSeparately = false,
+    this.estimatedMagiCents,
+  }) {
+    _validateCents(overtimeCompensationCents, 'overtime compensation');
+    _validateCents(regularRateCents, 'regular rate');
+    if (overtimeHoursThousandths < 0 || overtimeHoursThousandths > 1000000000) {
+      throw ArgumentError.value(overtimeHoursThousandths, 'overtime hours');
+    }
+    if (overtimeMultiplierThousandths <= 0 ||
+        overtimeMultiplierThousandths > 1000000) {
+      throw ArgumentError.value(
+        overtimeMultiplierThousandths,
+        'overtime multiplier',
+      );
+    }
+    final potentialNumerator =
+        BigInt.from(regularRateCents) * BigInt.from(overtimeHoursThousandths);
+    if (potentialNumerator >=
+        BigInt.from(PayrollInputs.maxInputCents) * BigInt.from(2000) +
+            BigInt.from(1000)) {
+      throw ArgumentError(
+        'Overtime inputs exceed the supported calculation range.',
+      );
+    }
+    if (estimatedMagiCents != null) {
+      _validateCents(estimatedMagiCents!, 'estimated MAGI');
+    }
+  }
+
+  final int overtimeCompensationCents;
+  final int regularRateCents;
+  final int overtimeHoursThousandths;
+  final int overtimeMultiplierThousandths;
+  final bool treatAsFlsaQualified;
+  final bool marriedFilingSeparately;
+  final int? estimatedMagiCents;
+
+  static void _validateCents(int value, String label) {
+    if (value < 0 || value > PayrollInputs.maxInputCents) {
+      throw ArgumentError.value(
+        value,
+        label,
+        'Must be non-negative and within supported range.',
+      );
+    }
+  }
+}
+
 /// U.S. state jurisdictions plus the District of Columbia.
 enum StateCode {
   notSelected('Select a state'),
@@ -119,7 +176,7 @@ class PayrollInputs {
     this.step4aAnnualCents = 0,
     this.step4bAnnualCents = 0,
     this.step4cPerPaycheckCents = 0,
-    this.exemptFromFederalWithholding = false,
+    this.qualifiedOvertime,
   }) {
     _validateCents(grossPayCents, 'gross pay');
     final wageBases =
@@ -161,7 +218,10 @@ class PayrollInputs {
   final int step4aAnnualCents;
   final int step4bAnnualCents;
   final int step4cPerPaycheckCents;
-  final bool exemptFromFederalWithholding;
+
+  /// Other Step 4(b) deduction amount. Qualified overtime is modeled
+  /// separately and is added to this only for federal withholding.
+  final QualifiedOvertimeInputs? qualifiedOvertime;
 
   factory PayrollInputs.fromDollars({
     required double grossPay,
@@ -176,7 +236,7 @@ class PayrollInputs {
     double step4aAnnual = 0,
     double step4bAnnual = 0,
     double step4cPerPaycheck = 0,
-    bool exemptFromFederalWithholding = false,
+    QualifiedOvertimeInputs? qualifiedOvertime,
   }) {
     return PayrollInputs(
       grossPayCents: dollarsToCents(grossPay, 'gross pay'),
@@ -198,7 +258,7 @@ class PayrollInputs {
       step4aAnnualCents: dollarsToCents(step4aAnnual, 'Step 4(a)'),
       step4bAnnualCents: dollarsToCents(step4bAnnual, 'Step 4(b)'),
       step4cPerPaycheckCents: dollarsToCents(step4cPerPaycheck, 'Step 4(c)'),
-      exemptFromFederalWithholding: exemptFromFederalWithholding,
+      qualifiedOvertime: qualifiedOvertime,
     );
   }
 
