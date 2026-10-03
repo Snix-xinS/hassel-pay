@@ -17,6 +17,88 @@ enum FederalFilingStatus {
   headOfHousehold,
 }
 
+/// U.S. state jurisdictions plus the District of Columbia.
+enum StateCode {
+  notSelected('Select a state'),
+  alabama('Alabama'),
+  alaska('Alaska'),
+  arizona('Arizona'),
+  arkansas('Arkansas'),
+  california('California'),
+  colorado('Colorado'),
+  connecticut('Connecticut'),
+  delaware('Delaware'),
+  districtOfColumbia('District of Columbia'),
+  florida('Florida'),
+  georgia('Georgia'),
+  hawaii('Hawaii'),
+  idaho('Idaho'),
+  illinois('Illinois'),
+  indiana('Indiana'),
+  iowa('Iowa'),
+  kansas('Kansas'),
+  kentucky('Kentucky'),
+  louisiana('Louisiana'),
+  maine('Maine'),
+  maryland('Maryland'),
+  massachusetts('Massachusetts'),
+  michigan('Michigan'),
+  minnesota('Minnesota'),
+  mississippi('Mississippi'),
+  missouri('Missouri'),
+  montana('Montana'),
+  nebraska('Nebraska'),
+  nevada('Nevada'),
+  newHampshire('New Hampshire'),
+  newJersey('New Jersey'),
+  newMexico('New Mexico'),
+  newYork('New York'),
+  northCarolina('North Carolina'),
+  northDakota('North Dakota'),
+  ohio('Ohio'),
+  oklahoma('Oklahoma'),
+  oregon('Oregon'),
+  pennsylvania('Pennsylvania'),
+  rhodeIsland('Rhode Island'),
+  southCarolina('South Carolina'),
+  southDakota('South Dakota'),
+  tennessee('Tennessee'),
+  texas('Texas'),
+  utah('Utah'),
+  vermont('Vermont'),
+  virginia('Virginia'),
+  washington('Washington'),
+  westVirginia('West Virginia'),
+  wisconsin('Wisconsin'),
+  wyoming('Wyoming');
+
+  const StateCode(this.label);
+
+  final String label;
+}
+
+/// Per-tax wage bases. All default to gross pay until deduction rules exist.
+class TaxableWageBases {
+  const TaxableWageBases({
+    required this.federalIncomeTaxCents,
+    required this.socialSecurityCents,
+    required this.medicareCents,
+    required this.stateIncomeTaxCents,
+  });
+
+  factory TaxableWageBases.fromGrossPay(int grossPayCents) => TaxableWageBases(
+    federalIncomeTaxCents: grossPayCents,
+    socialSecurityCents: grossPayCents,
+    medicareCents: grossPayCents,
+    stateIncomeTaxCents: grossPayCents,
+  );
+
+  final int federalIncomeTaxCents;
+  final int socialSecurityCents;
+  final int medicareCents;
+  final int stateIncomeTaxCents;
+}
+
 /// All dollar amounts are stored as integer cents.
 ///
 /// [fromDollars] is available for callers that start with decimal dollar
@@ -27,13 +109,32 @@ class PayrollInputs {
     required this.grossPayCents,
     required this.filingStatus,
     required this.payFrequency,
+    this.taxableWageBases,
+    this.state = StateCode.notSelected,
+    this.ytdSocialSecurityWagesCents,
+    this.ytdMedicareWagesCents,
+    this.otherCashDeductionsCents = 0,
     this.step2Checkbox = false,
     this.step3AnnualCents = 0,
     this.step4aAnnualCents = 0,
     this.step4bAnnualCents = 0,
     this.step4cPerPaycheckCents = 0,
+    this.exemptFromFederalWithholding = false,
   }) {
     _validateCents(grossPayCents, 'gross pay');
+    final wageBases =
+        taxableWageBases ?? TaxableWageBases.fromGrossPay(grossPayCents);
+    _validateCents(wageBases.federalIncomeTaxCents, 'federal taxable wages');
+    _validateCents(wageBases.socialSecurityCents, 'Social Security wages');
+    _validateCents(wageBases.medicareCents, 'Medicare wages');
+    _validateCents(wageBases.stateIncomeTaxCents, 'state taxable wages');
+    if (ytdSocialSecurityWagesCents != null) {
+      _validateCents(ytdSocialSecurityWagesCents!, 'YTD Social Security wages');
+    }
+    if (ytdMedicareWagesCents != null) {
+      _validateCents(ytdMedicareWagesCents!, 'YTD Medicare wages');
+    }
+    _validateCents(otherCashDeductionsCents, 'other after-tax deductions');
     _validateCents(step3AnnualCents, 'Step 3');
     _validateCents(step4aAnnualCents, 'Step 4(a)');
     _validateCents(step4bAnnualCents, 'Step 4(b)');
@@ -44,6 +145,15 @@ class PayrollInputs {
   static const int maxInputCents = 100000000000000; // $1 trillion.
 
   final int grossPayCents;
+  final TaxableWageBases? taxableWageBases;
+  final StateCode state;
+
+  /// Null means YTD wages were not provided and the estimate assumes zero.
+  final int? ytdSocialSecurityWagesCents;
+
+  /// Null means YTD wages were not provided and the estimate assumes zero.
+  final int? ytdMedicareWagesCents;
+  final int otherCashDeductionsCents;
   final FederalFilingStatus filingStatus;
   final PayFrequency payFrequency;
   final bool step2Checkbox;
@@ -51,26 +161,44 @@ class PayrollInputs {
   final int step4aAnnualCents;
   final int step4bAnnualCents;
   final int step4cPerPaycheckCents;
+  final bool exemptFromFederalWithholding;
 
   factory PayrollInputs.fromDollars({
     required double grossPay,
     required FederalFilingStatus filingStatus,
     required PayFrequency payFrequency,
+    StateCode state = StateCode.notSelected,
+    double? ytdSocialSecurityWages,
+    double? ytdMedicareWages,
+    double otherCashDeductions = 0,
     bool step2Checkbox = false,
     double step3Annual = 0,
     double step4aAnnual = 0,
     double step4bAnnual = 0,
     double step4cPerPaycheck = 0,
+    bool exemptFromFederalWithholding = false,
   }) {
     return PayrollInputs(
       grossPayCents: dollarsToCents(grossPay, 'gross pay'),
       filingStatus: filingStatus,
       payFrequency: payFrequency,
+      state: state,
+      ytdSocialSecurityWagesCents: ytdSocialSecurityWages == null
+          ? null
+          : dollarsToCents(ytdSocialSecurityWages, 'YTD Social Security wages'),
+      ytdMedicareWagesCents: ytdMedicareWages == null
+          ? null
+          : dollarsToCents(ytdMedicareWages, 'YTD Medicare wages'),
+      otherCashDeductionsCents: dollarsToCents(
+        otherCashDeductions,
+        'other after-tax deductions',
+      ),
       step2Checkbox: step2Checkbox,
       step3AnnualCents: dollarsToCents(step3Annual, 'Step 3'),
       step4aAnnualCents: dollarsToCents(step4aAnnual, 'Step 4(a)'),
       step4bAnnualCents: dollarsToCents(step4bAnnual, 'Step 4(b)'),
       step4cPerPaycheckCents: dollarsToCents(step4cPerPaycheck, 'Step 4(c)'),
+      exemptFromFederalWithholding: exemptFromFederalWithholding,
     );
   }
 

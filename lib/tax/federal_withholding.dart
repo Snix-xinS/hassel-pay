@@ -44,7 +44,35 @@ class FederalWithholdingCalculator {
 
   FederalWithholdingResult calculate(PayrollInputs inputs) {
     final periods = inputs.payFrequency.payPeriodsPerYear;
-    final annualizedWagesCents = inputs.grossPayCents * periods;
+    final taxableWages =
+        inputs.taxableWageBases ??
+        TaxableWageBases.fromGrossPay(inputs.grossPayCents);
+    final annualizedWagesCents = taxableWages.federalIncomeTaxCents * periods;
+
+    // The 2026 W-4 exemption is a withholding instruction, not a tax formula.
+    // Pub. 15-T says an exempt employee does not complete Steps 2–4, so the
+    // exemption overrides those values if they were nevertheless supplied.
+    if (inputs.exemptFromFederalWithholding) {
+      final row = config
+          .tableFor(inputs.filingStatus, step2Checkbox: inputs.step2Checkbox)
+          .first;
+      return FederalWithholdingResult(
+        taxYear: config.taxYear,
+        adjustedAnnualWagesCents: 0,
+        annualTentativeWithholdingCents: 0,
+        annualStep3CreditCents: 0,
+        payPeriodFederalIncomeTaxCents: 0,
+        step4cAdditionalWithholdingCents: 0,
+        finalFederalIncomeTaxWithholdingCents: 0,
+        payPeriodsPerYear: periods,
+        selectedTableRow: row,
+        assumptions: const [
+          'Federal withholding exemption is selected; the user is responsible for meeting W-4 eligibility requirements.',
+          'W-4 instructions say an exempt employee completes only Steps 1(a), 1(b), and 5; Steps 2–4 are ignored.',
+        ],
+      );
+    }
+
     final standardAdjustmentCents = inputs.step2Checkbox
         ? 0
         : config.standardAdjustmentCents(inputs.filingStatus);

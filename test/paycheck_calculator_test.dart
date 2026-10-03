@@ -112,7 +112,7 @@ void main() {
     await tester.tap(find.text('Calculate Pay'));
     await tester.pumpAndSettle();
     expect(find.text('GROSS PAY - WEEKLY'), findsOneWidget);
-    expect(find.text('\$1100.00'), findsNWidgets(2));
+    expect(find.text('\$1100.00'), findsNWidgets(3));
 
     await tester.ensureVisible(find.text('Clear'));
     await tester.tap(find.text('Clear'));
@@ -142,5 +142,27 @@ void main() {
       '',
     );
     expect(find.text('\$0.00'), findsNWidgets(4));
+  });
+
+  testWidgets('tax estimate marks an unselected state and Clear removes it', (
+    tester,
+  ) async {
+    await tester.pumpWidget(const PaycheckCalculatorApp());
+    await tester.enterText(find.byType(EditableText).at(0), '20');
+    await tester.enterText(find.byType(EditableText).at(1), '40');
+    await tester.enterText(find.byType(EditableText).at(2), '0');
+    await tester.ensureVisible(find.text('Calculate Pay'));
+    await tester.tap(find.text('Calculate Pay'));
+    await tester.pumpAndSettle();
+    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsOneWidget);
+    expect(
+      find.textContaining('Estimated take-home unavailable'),
+      findsOneWidget,
+    );
+
+    await tester.ensureVisible(find.text('Clear'));
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
   });
 }

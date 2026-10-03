@@ -38,6 +38,17 @@ class TaxYearConfig {
 
   final int taxYear;
 
+  int get socialSecurityRateBasisPoints => 620;
+  int get socialSecurityWageBaseCents => 18450000;
+  int get medicareRateBasisPoints => 145;
+  int get additionalMedicareRateBasisPoints => 90;
+  int get additionalMedicareWithholdingThresholdCents => 20000000;
+
+  /// Calculates employee tax in cents, rounded half up to one cent.
+  int withholdingCents(int taxableWagesCents, int rateBasisPoints) {
+    return (taxableWagesCents * rateBasisPoints + 5000) ~/ 10000;
+  }
+
   int get standardAdjustmentSingleOrMfsCents => 860000;
   int get standardAdjustmentMarriedFilingJointlyCents => 1290000;
 

@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'paycheck_calculator.dart';
+import 'tax/paycheck_result.dart';
+import 'tax/paycheck_tax_service.dart';
+import 'tax/payroll_inputs.dart' as tax;
+import 'tax/state/state_tax_provider.dart';
 
 void main() {
   runApp(const PaycheckCalculatorApp());
@@ -87,11 +91,35 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   final TextEditingController overtimeHoursController = TextEditingController();
   final TextEditingController overtimeMultiplierController =
       TextEditingController(text: '1.5');
+  final TextEditingController step3Controller = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController step4aController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController step4bController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController step4cController = TextEditingController(
+    text: '0',
+  );
+  final TextEditingController socialSecurityYtdController =
+      TextEditingController();
+  final TextEditingController medicareYtdController = TextEditingController();
+  final TextEditingController otherDeductionsController = TextEditingController(
+    text: '0',
+  );
+  final PaycheckTaxService taxService = const PaycheckTaxService();
 
   PaycheckResult? result;
+  PaycheckTaxResult? taxResult;
   PayPeriod selectedPayPeriod = PayPeriod.weekly;
   FilingStatus selectedFilingStatus =
       FilingStatus.singleOrMarriedFilingSeparately;
+  tax.StateCode selectedState = tax.StateCode.notSelected;
+  bool step2Checked = false;
+  bool federalExempt = false;
+  String? taxInputError;
 
   String? hourlyRateError;
   String? regularHoursError;
@@ -121,6 +149,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       return;
     }
 
+    PaycheckResult? grossResult;
     try {
       final inputs = PaycheckInputs.fromText(
         hourlyRate: hourlyRateController.text,
@@ -129,11 +158,73 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
         overtimeMultiplier: overtimeMultiplierController.text,
         payPeriod: selectedPayPeriod,
       );
-      setState(() => result = calculator.calculate(inputs));
-    } on ArgumentError {
-      setState(() => result = null);
+      final calculated = calculator.calculate(inputs);
+      grossResult = calculated;
+      final taxInputs = tax.PayrollInputs.fromDollars(
+        grossPay: calculated.grossPay,
+        filingStatus: switch (selectedFilingStatus) {
+          FilingStatus.singleOrMarriedFilingSeparately =>
+            tax.FederalFilingStatus.singleOrMarriedFilingSeparately,
+          FilingStatus.marriedFilingJointly =>
+            tax.FederalFilingStatus.marriedFilingJointly,
+          FilingStatus.headOfHousehold =>
+            tax.FederalFilingStatus.headOfHousehold,
+        },
+        payFrequency: switch (selectedPayPeriod) {
+          PayPeriod.weekly => tax.PayFrequency.weekly,
+          PayPeriod.biweekly => tax.PayFrequency.biweekly,
+          PayPeriod.semimonthly => tax.PayFrequency.semimonthly,
+          PayPeriod.monthly => tax.PayFrequency.monthly,
+        },
+        state: selectedState,
+        ytdSocialSecurityWages: _optionalMoney(
+          socialSecurityYtdController.text,
+        ),
+        ytdMedicareWages: _optionalMoney(medicareYtdController.text),
+        step2Checkbox: step2Checked,
+        step3Annual: _money(step3Controller.text),
+        step4aAnnual: _money(step4aController.text),
+        step4bAnnual: _money(step4bController.text),
+        step4cPerPaycheck: _money(step4cController.text),
+        otherCashDeductions: _money(otherDeductionsController.text),
+        exemptFromFederalWithholding: federalExempt,
+      );
+      final calculatedTax = taxService.calculate(taxInputs);
+      setState(() {
+        result = calculated;
+        taxResult = calculatedTax;
+        taxInputError = null;
+      });
+    } on FormatException catch (error) {
+      setState(() {
+        result = grossResult;
+        taxResult = null;
+        taxInputError = error.message;
+      });
+    } on ArgumentError catch (error) {
+      setState(() {
+        result = grossResult;
+        taxResult = null;
+        taxInputError = error.message?.toString() ?? 'Check tax inputs.';
+      });
     }
   }
+
+  double _money(String text) {
+    final parsed = double.tryParse(text.trim());
+    if (parsed == null || !parsed.isFinite || parsed < 0) {
+      throw FormatException('Enter a valid non-negative tax amount.');
+    }
+    return parsed;
+  }
+
+  double? _optionalMoney(String text) =>
+      text.trim().isEmpty ? null : _money(text);
+
+  void clearTaxResult() => setState(() {
+    taxResult = null;
+    taxInputError = null;
+  });
 
   void applyHoursPreset({
     required String regularHours,
@@ -146,6 +237,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       regularHoursError = null;
       overtimeHoursError = null;
       result = null;
+      taxResult = null;
     });
   }
 
@@ -154,15 +246,27 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     regularHoursController.clear();
     overtimeHoursController.clear();
     overtimeMultiplierController.text = '1.5';
+    step3Controller.text = '0';
+    step4aController.text = '0';
+    step4bController.text = '0';
+    step4cController.text = '0';
+    socialSecurityYtdController.clear();
+    medicareYtdController.clear();
+    otherDeductionsController.text = '0';
 
     setState(() {
       result = null;
+      taxResult = null;
       selectedPayPeriod = PayPeriod.weekly;
       selectedFilingStatus = FilingStatus.singleOrMarriedFilingSeparately;
       hourlyRateError = null;
       regularHoursError = null;
       overtimeHoursError = null;
       overtimeMultiplierError = null;
+      selectedState = tax.StateCode.notSelected;
+      step2Checked = false;
+      federalExempt = false;
+      taxInputError = null;
     });
   }
 
@@ -172,6 +276,13 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     regularHoursController.dispose();
     overtimeHoursController.dispose();
     overtimeMultiplierController.dispose();
+    step3Controller.dispose();
+    step4aController.dispose();
+    step4bController.dispose();
+    step4cController.dispose();
+    socialSecurityYtdController.dispose();
+    medicareYtdController.dispose();
+    otherDeductionsController.dispose();
     super.dispose();
   }
 
@@ -228,6 +339,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   setState(() {
                                     selectedPayPeriod = payPeriod;
                                     result = null;
+                                    taxResult = null;
                                   });
                                 },
                               ),
@@ -243,6 +355,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   setState(() {
                                     hourlyRateError = null;
                                     result = null;
+                                    taxResult = null;
                                   });
                                 },
                               ),
@@ -259,6 +372,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   setState(() {
                                     regularHoursError = null;
                                     result = null;
+                                    taxResult = null;
                                   });
                                 },
                               ),
@@ -273,6 +387,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   setState(() {
                                     overtimeHoursError = null;
                                     result = null;
+                                    taxResult = null;
                                   });
                                 },
                               ),
@@ -287,6 +402,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   setState(() {
                                     overtimeMultiplierError = null;
                                     result = null;
+                                    taxResult = null;
                                   });
                                 },
                               ),
@@ -296,18 +412,125 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Federal Tax Settings',
-                          subtitle:
-                              'Used later to estimate federal withholding',
-                          child: _FilingStatusSelector(
-                            value: selectedFilingStatus,
-                            onChanged: (filingStatus) {
-                              if (filingStatus == null) {
-                                return;
-                              }
-                              setState(() {
-                                selectedFilingStatus = filingStatus;
-                              });
-                            },
+                          subtitle: 'Estimate federal and other withholding',
+                          child: Column(
+                            children: [
+                              _FilingStatusSelector(
+                                value: selectedFilingStatus,
+                                onChanged: (filingStatus) {
+                                  if (filingStatus == null) return;
+                                  setState(() {
+                                    selectedFilingStatus = filingStatus;
+                                    taxResult = null;
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 10),
+                              Material(
+                                color: Colors.transparent,
+                                child: ExpansionTile(
+                                  tilePadding: EdgeInsets.zero,
+                                  title: const Text(
+                                    'W-4 adjustments and payroll details',
+                                  ),
+                                  children: [
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text(
+                                        'W-4 Step 2: multiple jobs',
+                                      ),
+                                      value: step2Checked,
+                                      onChanged: (value) => setState(() {
+                                        step2Checked = value;
+                                        taxResult = null;
+                                      }),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: step3Controller,
+                                      label: 'Step 3 annual credits',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: step4aController,
+                                      label: 'Step 4(a) annual other income',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: step4bController,
+                                      label: 'Step 4(b) annual deductions',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: step4cController,
+                                      label: 'Step 4(c) extra per paycheck',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    SwitchListTile(
+                                      contentPadding: EdgeInsets.zero,
+                                      title: const Text(
+                                        'Claim exempt from federal withholding',
+                                      ),
+                                      subtitle: const Text(
+                                        'Only if you had no federal income-tax liability last year and expect none this year.',
+                                      ),
+                                      value: federalExempt,
+                                      onChanged: (value) => setState(() {
+                                        federalExempt = value;
+                                        taxResult = null;
+                                      }),
+                                    ),
+                                    DropdownButtonFormField<tax.StateCode>(
+                                      initialValue: selectedState,
+                                      isExpanded: true,
+                                      decoration: const InputDecoration(
+                                        labelText: 'State',
+                                      ),
+                                      items: tax.StateCode.values
+                                          .map(
+                                            (state) => DropdownMenuItem(
+                                              value: state,
+                                              child: Text(state.label),
+                                            ),
+                                          )
+                                          .toList(),
+                                      onChanged: (value) => setState(() {
+                                        selectedState =
+                                            value ?? tax.StateCode.notSelected;
+                                        taxResult = null;
+                                      }),
+                                    ),
+                                    const SizedBox(height: 8),
+                                    _TaxAmountField(
+                                      controller: socialSecurityYtdController,
+                                      label:
+                                          'Current-employer Social Security wages YTD (blank assumes \$0)',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: medicareYtdController,
+                                      label:
+                                          'Current-employer Medicare wages YTD (blank assumes \$0)',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    _TaxAmountField(
+                                      controller: otherDeductionsController,
+                                      label:
+                                          'Other after-tax deductions per check',
+                                      onChanged: (_) => clearTaxResult(),
+                                    ),
+                                    const Padding(
+                                      padding: EdgeInsets.symmetric(
+                                        vertical: 8,
+                                      ),
+                                      child: Text(
+                                        'Pre-tax deductions are not modeled. Federal exemption eligibility is not verified.',
+                                        style: TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         const SizedBox(height: 20),
@@ -351,6 +574,91 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                             ],
                           ),
                         ),
+                        if (taxInputError != null) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            taxInputError!,
+                            style: TextStyle(color: colorScheme.error),
+                          ),
+                        ],
+                        if (taxResult != null) ...[
+                          const SizedBox(height: 20),
+                          _SectionCard(
+                            title: 'TAX & TAKE-HOME ESTIMATE',
+                            subtitle:
+                                'Estimated paycheck withholding — not a final tax calculation.',
+                            child: Column(
+                              children: [
+                                _TaxResultRow(
+                                  label: 'Gross Pay',
+                                  cents: taxResult!.grossPayCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'Federal Income Tax',
+                                  cents: taxResult!.federalIncomeTaxCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'Social Security',
+                                  cents: taxResult!.socialSecurityCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'Medicare',
+                                  cents: taxResult!.medicareCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'Additional Medicare',
+                                  cents: taxResult!.additionalMedicareCents,
+                                ),
+                                _TaxResultRow(
+                                  label: 'State Income Tax',
+                                  cents: taxResult!.stateIncomeTaxCents,
+                                  suffix: switch (taxResult!.stateStatus) {
+                                    StateTaxSupportStatus.supported => null,
+                                    StateTaxSupportStatus.unsupported =>
+                                      'Not supported',
+                                    StateTaxSupportStatus.notSelected =>
+                                      'Select a state',
+                                  },
+                                ),
+                                _TaxResultRow(
+                                  label: 'Other after-tax deductions',
+                                  cents: taxResult!.otherDeductionsCents,
+                                ),
+                                const Divider(height: 20),
+                                _TaxResultRow(
+                                  label: 'Known withholding subtotal',
+                                  cents: taxResult!.totalWithholdingCents,
+                                  bold: true,
+                                ),
+                                const SizedBox(height: 10),
+                                Text(
+                                  taxResult!.estimatedTakeHomePayCents == null
+                                      ? 'Estimated take-home unavailable until a supported state is selected.'
+                                      : 'ESTIMATED TAKE-HOME\n\$${(taxResult!.estimatedTakeHomePayCents! / 100).toStringAsFixed(2)}',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 20,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(height: 10),
+                                ...taxResult!.warnings.map(
+                                  (warning) => Padding(
+                                    padding: const EdgeInsets.only(top: 4),
+                                    child: Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: Text(
+                                        '• $warning',
+                                        style: const TextStyle(fontSize: 12),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -844,6 +1152,67 @@ class _BreakdownRow extends StatelessWidget {
       ),
     );
   }
+}
+
+class _TaxAmountField extends StatelessWidget {
+  const _TaxAmountField({
+    required this.controller,
+    required this.label,
+    required this.onChanged,
+  });
+
+  final TextEditingController controller;
+  final String label;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 10),
+    child: TextField(
+      controller: controller,
+      onChanged: onChanged,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixText: '\$ ',
+        filled: true,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+  );
+}
+
+class _TaxResultRow extends StatelessWidget {
+  const _TaxResultRow({
+    required this.label,
+    required this.cents,
+    this.suffix,
+    this.bold = false,
+  });
+
+  final String label;
+  final int cents;
+  final String? suffix;
+  final bool bold;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 5),
+    child: Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: TextStyle(fontWeight: bold ? FontWeight.bold : null),
+          ),
+        ),
+        Text(
+          suffix ?? '\$${(cents / 100).toStringAsFixed(2)}',
+          style: TextStyle(fontWeight: bold ? FontWeight.bold : null),
+        ),
+      ],
+    ),
+  );
 }
 
 class _GrossPaySummaryRow extends StatelessWidget {
