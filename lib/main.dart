@@ -459,7 +459,7 @@ class _AppHeader extends StatelessWidget {
               ),
               const SizedBox(height: 2),
               Text(
-                'Calculate your gross pay',
+                'Estimate your gross pay in seconds.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
