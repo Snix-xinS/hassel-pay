@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'paycheck_calculator.dart';
+
 void main() {
   runApp(const PaycheckCalculatorApp());
 }
@@ -52,28 +54,6 @@ class PaycheckCalculatorApp extends StatelessWidget {
   }
 }
 
-enum PayPeriod {
-  weekly,
-  biweekly,
-  semimonthly,
-  monthly,
-}
-
-extension PayPeriodLabel on PayPeriod {
-  String get label {
-    switch (this) {
-      case PayPeriod.weekly:
-        return 'Weekly';
-      case PayPeriod.biweekly:
-        return 'Biweekly';
-      case PayPeriod.semimonthly:
-        return 'Semimonthly';
-      case PayPeriod.monthly:
-        return 'Monthly';
-    }
-  }
-}
-
 enum FilingStatus {
   singleOrMarriedFilingSeparately,
   marriedFilingJointly,
@@ -97,22 +77,18 @@ class PaycheckCalculatorPage extends StatefulWidget {
   const PaycheckCalculatorPage({super.key});
 
   @override
-  State<PaycheckCalculatorPage> createState() =>
-      _PaycheckCalculatorPageState();
+  State<PaycheckCalculatorPage> createState() => _PaycheckCalculatorPageState();
 }
 
 class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
+  final PaycheckCalculator calculator = const PaycheckCalculator();
   final TextEditingController hourlyRateController = TextEditingController();
-  final TextEditingController regularHoursController =
-      TextEditingController();
-  final TextEditingController overtimeHoursController =
-      TextEditingController();
+  final TextEditingController regularHoursController = TextEditingController();
+  final TextEditingController overtimeHoursController = TextEditingController();
   final TextEditingController overtimeMultiplierController =
       TextEditingController(text: '1.5');
 
-  double grossPay = 0;
-  double regularPay = 0;
-  double overtimePay = 0;
+  PaycheckResult? result;
   PayPeriod selectedPayPeriod = PayPeriod.weekly;
   FilingStatus selectedFilingStatus =
       FilingStatus.singleOrMarriedFilingSeparately;
@@ -122,57 +98,22 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
   String? overtimeHoursError;
   String? overtimeMultiplierError;
 
-  String? validateNumberField({
-    required String value,
-    required String fieldLabel,
-  }) {
-    final trimmed = value.trim();
-
-    if (trimmed.isEmpty) {
-      return 'Enter $fieldLabel.';
-    }
-
-    final parsed = double.tryParse(trimmed);
-    if (parsed == null) {
-      return 'Enter a valid number for $fieldLabel.';
-    }
-
-    if (parsed < 0) {
-      return '$fieldLabel cannot be negative.';
-    }
-
-    return null;
-  }
-
   bool validateInputs() {
-    final nextHourlyRateError = validateNumberField(
-      value: hourlyRateController.text,
-      fieldLabel: 'hourly rate',
-    );
-    final nextRegularHoursError = validateNumberField(
-      value: regularHoursController.text,
-      fieldLabel: 'regular hours',
-    );
-    final nextOvertimeHoursError = validateNumberField(
-      value: overtimeHoursController.text,
-      fieldLabel: 'overtime hours',
-    );
-    final nextOvertimeMultiplierError = validateNumberField(
-      value: overtimeMultiplierController.text,
-      fieldLabel: 'overtime multiplier',
+    final errors = PaycheckInputs.validateText(
+      hourlyRate: hourlyRateController.text,
+      regularHours: regularHoursController.text,
+      overtimeHours: overtimeHoursController.text,
+      overtimeMultiplier: overtimeMultiplierController.text,
     );
 
     setState(() {
-      hourlyRateError = nextHourlyRateError;
-      regularHoursError = nextRegularHoursError;
-      overtimeHoursError = nextOvertimeHoursError;
-      overtimeMultiplierError = nextOvertimeMultiplierError;
+      hourlyRateError = errors['hourlyRate'];
+      regularHoursError = errors['regularHours'];
+      overtimeHoursError = errors['overtimeHours'];
+      overtimeMultiplierError = errors['overtimeMultiplier'];
     });
 
-    return nextHourlyRateError == null &&
-        nextRegularHoursError == null &&
-        nextOvertimeHoursError == null &&
-        nextOvertimeMultiplierError == null;
+    return errors.isEmpty;
   }
 
   void calculatePay() {
@@ -180,27 +121,18 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
       return;
     }
 
-    final double hourlyRate =
-        double.tryParse(hourlyRateController.text) ?? 0;
-
-    final double regularHours =
-        double.tryParse(regularHoursController.text) ?? 0;
-
-    final double overtimeHours =
-        double.tryParse(overtimeHoursController.text) ?? 0;
-
-    final double overtimeMultiplier =
-        double.tryParse(overtimeMultiplierController.text) ?? 1.5;
-
-    final double regularPay = hourlyRate * regularHours;
-    final double overtimePay =
-        hourlyRate * overtimeMultiplier * overtimeHours;
-
-    setState(() {
-      this.regularPay = regularPay;
-      this.overtimePay = overtimePay;
-      grossPay = regularPay + overtimePay;
-    });
+    try {
+      final inputs = PaycheckInputs.fromText(
+        hourlyRate: hourlyRateController.text,
+        regularHours: regularHoursController.text,
+        overtimeHours: overtimeHoursController.text,
+        overtimeMultiplier: overtimeMultiplierController.text,
+        payPeriod: selectedPayPeriod,
+      );
+      setState(() => result = calculator.calculate(inputs));
+    } on ArgumentError {
+      setState(() => result = null);
+    }
   }
 
   void applyHoursPreset({
@@ -213,6 +145,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     setState(() {
       regularHoursError = null;
       overtimeHoursError = null;
+      result = null;
     });
   }
 
@@ -223,9 +156,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
     overtimeMultiplierController.text = '1.5';
 
     setState(() {
-      grossPay = 0;
-      regularPay = 0;
-      overtimePay = 0;
+      result = null;
       selectedPayPeriod = PayPeriod.weekly;
       selectedFilingStatus = FilingStatus.singleOrMarriedFilingSeparately;
       hourlyRateError = null;
@@ -258,8 +189,9 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final maxContentWidth =
-                  constraints.maxWidth > 560 ? 520.0 : constraints.maxWidth;
+              final maxContentWidth = constraints.maxWidth > 560
+                  ? 520.0
+                  : constraints.maxWidth;
 
               return Align(
                 alignment: Alignment.topCenter,
@@ -277,7 +209,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                       children: [
                         const _AppHeader(),
                         const SizedBox(height: 20),
-                        _GrossPayHero(amount: grossPay),
+                        _GrossPayHero(
+                          amount: result?.grossPay ?? 0,
+                          payPeriod: selectedPayPeriod,
+                        ),
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Hours & rate',
@@ -292,6 +227,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                   }
                                   setState(() {
                                     selectedPayPeriod = payPeriod;
+                                    result = null;
                                   });
                                 },
                               ),
@@ -304,15 +240,14 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 icon: Icons.payments_outlined,
                                 errorText: hourlyRateError,
                                 onChanged: (_) {
-                                  if (hourlyRateError != null) {
-                                    setState(() => hourlyRateError = null);
-                                  }
+                                  setState(() {
+                                    hourlyRateError = null;
+                                    result = null;
+                                  });
                                 },
                               ),
                               const SizedBox(height: 14),
-                              _HoursPresets(
-                                onSelect: applyHoursPreset,
-                              ),
+                              _HoursPresets(onSelect: applyHoursPreset),
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: regularHoursController,
@@ -321,9 +256,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 icon: Icons.schedule_outlined,
                                 errorText: regularHoursError,
                                 onChanged: (_) {
-                                  if (regularHoursError != null) {
-                                    setState(() => regularHoursError = null);
-                                  }
+                                  setState(() {
+                                    regularHoursError = null;
+                                    result = null;
+                                  });
                                 },
                               ),
                               const SizedBox(height: 14),
@@ -334,9 +270,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 icon: Icons.more_time_outlined,
                                 errorText: overtimeHoursError,
                                 onChanged: (_) {
-                                  if (overtimeHoursError != null) {
-                                    setState(() => overtimeHoursError = null);
-                                  }
+                                  setState(() {
+                                    overtimeHoursError = null;
+                                    result = null;
+                                  });
                                 },
                               ),
                               const SizedBox(height: 14),
@@ -347,11 +284,10 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                                 icon: Icons.trending_up_outlined,
                                 errorText: overtimeMultiplierError,
                                 onChanged: (_) {
-                                  if (overtimeMultiplierError != null) {
-                                    setState(
-                                      () => overtimeMultiplierError = null,
-                                    );
-                                  }
+                                  setState(() {
+                                    overtimeMultiplierError = null;
+                                    result = null;
+                                  });
                                 },
                               ),
                             ],
@@ -360,7 +296,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Federal Tax Settings',
-                          subtitle: 'Used later to estimate federal withholding',
+                          subtitle:
+                              'Used later to estimate federal withholding',
                           child: _FilingStatusSelector(
                             value: selectedFilingStatus,
                             onChanged: (filingStatus) {
@@ -381,31 +318,34 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Pay Breakdown',
-                          subtitle: 'Regular, overtime, and total gross pay',
+                          subtitle:
+                              '${result?.payPeriod.label ?? selectedPayPeriod.label} gross pay before taxes and deductions',
                           child: Column(
                             children: [
                               _BreakdownRow(
                                 label: 'Regular Pay',
-                                value: regularPay,
+                                value: result?.regularPay ?? 0,
                                 colorScheme: colorScheme,
                               ),
                               const SizedBox(height: 8),
                               _BreakdownRow(
                                 label: 'Overtime Pay',
-                                value: overtimePay,
+                                value: result?.overtimePay ?? 0,
                                 colorScheme: colorScheme,
                               ),
                               Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 16),
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                ),
                                 child: Divider(
                                   height: 1,
-                                  color: colorScheme.outlineVariant
-                                      .withValues(alpha: 0.6),
+                                  color: colorScheme.outlineVariant.withValues(
+                                    alpha: 0.6,
+                                  ),
                                 ),
                               ),
                               _GrossPaySummaryRow(
-                                amount: grossPay,
+                                amount: result?.grossPay ?? 0,
                                 colorScheme: colorScheme,
                               ),
                             ],
@@ -453,16 +393,16 @@ class _AppHeader extends StatelessWidget {
               Text(
                 'Paycheck Calculator',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.4,
-                    ),
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.4,
+                ),
               ),
               const SizedBox(height: 2),
               Text(
                 'Estimate your gross pay in seconds.',
                 style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  color: colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
           ),
@@ -473,9 +413,10 @@ class _AppHeader extends StatelessWidget {
 }
 
 class _GrossPayHero extends StatelessWidget {
-  const _GrossPayHero({required this.amount});
+  const _GrossPayHero({required this.amount, required this.payPeriod});
 
   final double amount;
+  final PayPeriod payPeriod;
 
   @override
   Widget build(BuildContext context) {
@@ -507,7 +448,7 @@ class _GrossPayHero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'GROSS PAY',
+            'GROSS PAY - ${payPeriod.label.toUpperCase()}',
             style: TextStyle(
               color: colorScheme.onPrimary.withValues(alpha: 0.82),
               fontSize: 12,
@@ -581,16 +522,16 @@ class _SectionCard extends StatelessWidget {
         children: [
           Text(
             title,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 16),
           child,
@@ -606,7 +547,8 @@ class _HoursPresets extends StatelessWidget {
   final void Function({
     required String regularHours,
     required String overtimeHours,
-  }) onSelect;
+  })
+  onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -618,9 +560,9 @@ class _HoursPresets extends StatelessWidget {
         Text(
           'Quick Presets',
           style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colorScheme.onSurfaceVariant,
-              ),
+            fontWeight: FontWeight.w600,
+            color: colorScheme.onSurfaceVariant,
+          ),
         ),
         const SizedBox(height: 8),
         Wrap(
@@ -629,24 +571,17 @@ class _HoursPresets extends StatelessWidget {
           children: [
             ActionChip(
               label: const Text('Standard 40 Hours'),
-              onPressed: () => onSelect(
-                regularHours: '40',
-                overtimeHours: '0',
-              ),
+              onPressed: () => onSelect(regularHours: '40', overtimeHours: '0'),
             ),
             ActionChip(
               label: const Text('40 + 10 OT'),
-              onPressed: () => onSelect(
-                regularHours: '40',
-                overtimeHours: '10',
-              ),
+              onPressed: () =>
+                  onSelect(regularHours: '40', overtimeHours: '10'),
             ),
             ActionChip(
               label: const Text('40 + 20 OT'),
-              onPressed: () => onSelect(
-                regularHours: '40',
-                overtimeHours: '20',
-              ),
+              onPressed: () =>
+                  onSelect(regularHours: '40', overtimeHours: '20'),
             ),
           ],
         ),
@@ -656,10 +591,7 @@ class _HoursPresets extends StatelessWidget {
 }
 
 class _PayPeriodSelector extends StatelessWidget {
-  const _PayPeriodSelector({
-    required this.value,
-    required this.onChanged,
-  });
+  const _PayPeriodSelector({required this.value, required this.onChanged});
 
   final PayPeriod value;
   final ValueChanged<PayPeriod?> onChanged;
@@ -694,10 +626,7 @@ class _PayPeriodSelector extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: colorScheme.primary,
-            width: 1.6,
-          ),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
       ),
       items: PayPeriod.values
@@ -713,10 +642,7 @@ class _PayPeriodSelector extends StatelessWidget {
 }
 
 class _FilingStatusSelector extends StatelessWidget {
-  const _FilingStatusSelector({
-    required this.value,
-    required this.onChanged,
-  });
+  const _FilingStatusSelector({required this.value, required this.onChanged});
 
   final FilingStatus value;
   final ValueChanged<FilingStatus?> onChanged;
@@ -752,20 +678,14 @@ class _FilingStatusSelector extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: colorScheme.primary,
-            width: 1.6,
-          ),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
       ),
       items: FilingStatus.values
           .map(
             (status) => DropdownMenuItem<FilingStatus>(
               value: status,
-              child: Text(
-                status.label,
-                overflow: TextOverflow.ellipsis,
-              ),
+              child: Text(status.label, overflow: TextOverflow.ellipsis),
             ),
           )
           .toList(),
@@ -797,20 +717,14 @@ class _PayInputField extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final errorBorder = OutlineInputBorder(
       borderRadius: BorderRadius.circular(16),
-      borderSide: BorderSide(
-        color: colorScheme.error,
-        width: 1.6,
-      ),
+      borderSide: BorderSide(color: colorScheme.error, width: 1.6),
     );
 
     return TextField(
       controller: controller,
       onChanged: onChanged,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      style: const TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w600,
-      ),
+      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
@@ -836,10 +750,7 @@ class _PayInputField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(
-            color: colorScheme.primary,
-            width: 1.6,
-          ),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
         ),
         errorBorder: errorBorder,
         focusedErrorBorder: errorBorder,
@@ -849,10 +760,7 @@ class _PayInputField extends StatelessWidget {
 }
 
 class _ActionButtons extends StatelessWidget {
-  const _ActionButtons({
-    required this.onCalculate,
-    required this.onClear,
-  });
+  const _ActionButtons({required this.onCalculate, required this.onClear});
 
   final VoidCallback onCalculate;
   final VoidCallback onClear;
@@ -930,10 +838,7 @@ class _BreakdownRow extends StatelessWidget {
           ),
           Text(
             '\$${value.toStringAsFixed(2)}',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -942,10 +847,7 @@ class _BreakdownRow extends StatelessWidget {
 }
 
 class _GrossPaySummaryRow extends StatelessWidget {
-  const _GrossPaySummaryRow({
-    required this.amount,
-    required this.colorScheme,
-  });
+  const _GrossPaySummaryRow({required this.amount, required this.colorScheme});
 
   final double amount;
   final ColorScheme colorScheme;
