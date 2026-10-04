@@ -313,6 +313,41 @@ void main() {
     },
   );
 
+  testWidgets('privacy policy is accessible from the calculator', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(const PaycheckCalculatorApp());
+    final privacyButton = find.byKey(const Key('privacyPolicyButton'));
+    await tester.ensureVisible(privacyButton);
+    await tester.tap(privacyButton);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Hassel Pay Privacy Policy'), findsOneWidget);
+    expect(find.text('Local processing and transmission'), findsOneWidget);
+    final contact = find.text(
+      'hasselpayapp@gmail.com',
+    );
+    await tester.scrollUntilVisible(
+      contact,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(ListView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    expect(
+      contact,
+      findsOneWidget,
+    );
+  });
+
   testWidgets('qualified overtime controls invalidate and display estimate', (
     tester,
   ) async {

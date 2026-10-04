@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'paycheck_calculator.dart';
+import 'privacy_policy.dart';
 import 'tax/paycheck_result.dart';
 import 'tax/paycheck_tax_service.dart';
 import 'tax/payroll_inputs.dart' as tax;
@@ -852,6 +853,21 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                             ),
                           ),
                         ],
+                        const SizedBox(height: 16),
+                        Align(
+                          alignment: Alignment.center,
+                          child: TextButton(
+                            key: const Key('privacyPolicyButton'),
+                            onPressed: () {
+                              Navigator.of(context).push(
+                                MaterialPageRoute<void>(
+                                  builder: (_) => const PrivacyPolicyPage(),
+                                ),
+                              );
+                            },
+                            child: const Text('Privacy policy'),
+                          ),
+                        ),
                       ],
                     ),
                   ),
