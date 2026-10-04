@@ -8,6 +8,15 @@ enum PayPeriod {
   const PayPeriod(this.label);
 
   final String label;
+
+  int get payPeriodsPerYear => switch (this) {
+    PayPeriod.weekly => 52,
+    PayPeriod.biweekly => 26,
+    PayPeriod.semimonthly => 24,
+    PayPeriod.monthly => 12,
+  };
+
+  double get weeklyHoursMultiplier => 52 / payPeriodsPerYear;
 }
 
 /// Values entered by the user for one selected pay period.
@@ -108,12 +117,16 @@ class PaycheckResult {
     required this.overtimePay,
     required this.grossPay,
     required this.payPeriod,
+    required this.regularHours,
+    required this.overtimeHours,
   });
 
   final double regularPay;
   final double overtimePay;
   final double grossPay;
   final PayPeriod payPeriod;
+  final double regularHours;
+  final double overtimeHours;
 }
 
 class PaycheckCalculator {
@@ -132,9 +145,12 @@ class PaycheckCalculator {
         'Paycheck inputs must be finite and non-negative, with a positive overtime multiplier.',
       );
     }
-    final regularPay = inputs.hourlyRate * inputs.regularHours;
+    final periodMultiplier = inputs.payPeriod.weeklyHoursMultiplier;
+    final regularHours = inputs.regularHours * periodMultiplier;
+    final overtimeHours = inputs.overtimeHours * periodMultiplier;
+    final regularPay = inputs.hourlyRate * regularHours;
     final overtimePay =
-        inputs.hourlyRate * inputs.overtimeMultiplier * inputs.overtimeHours;
+        inputs.hourlyRate * inputs.overtimeMultiplier * overtimeHours;
     final grossPay = regularPay + overtimePay;
     if (!regularPay.isFinite || !overtimePay.isFinite || !grossPay.isFinite) {
       throw ArgumentError('The inputs produce an unrepresentable pay amount.');
@@ -144,6 +160,8 @@ class PaycheckCalculator {
       overtimePay: overtimePay,
       grossPay: grossPay,
       payPeriod: inputs.payPeriod,
+      regularHours: regularHours,
+      overtimeHours: overtimeHours,
     );
   }
 }

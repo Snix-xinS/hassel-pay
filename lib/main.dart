@@ -218,7 +218,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
           inputs.hourlyRate,
           'regular rate',
         ),
-        overtimeHoursThousandths: (inputs.overtimeHours * 1000).round(),
+        overtimeHoursThousandths: (calculated.overtimeHours * 1000).round(),
         overtimeMultiplierThousandths: (inputs.overtimeMultiplier * 1000)
             .round(),
         treatAsFlsaQualified: qualifiedOvertimeSelected,
@@ -399,7 +399,8 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                         const SizedBox(height: 20),
                         _SectionCard(
                           title: 'Hours & rate',
-                          subtitle: 'Enter your pay details for this check',
+                          subtitle:
+                              'Enter your weekly schedule. Paycheck hours are calculated from it.',
                           child: Column(
                             children: [
                               _PayPeriodSelector(
@@ -436,7 +437,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: regularHoursController,
-                                label: 'Regular hours',
+                                label: 'Regular hours per week',
                                 hint: '40',
                                 suffixText: 'hrs',
                                 icon: Icons.schedule_outlined,
@@ -452,7 +453,7 @@ class _PaycheckCalculatorPageState extends State<PaycheckCalculatorPage> {
                               const SizedBox(height: 14),
                               _PayInputField(
                                 controller: overtimeHoursController,
-                                label: 'Overtime hours',
+                                label: 'Overtime hours per week',
                                 hint: '0',
                                 suffixText: 'hrs',
                                 icon: Icons.more_time_outlined,

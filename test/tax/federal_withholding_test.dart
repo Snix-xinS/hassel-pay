@@ -45,6 +45,18 @@ void main() {
       expect(result.selectedTableRow.excessOverDollars, 19900);
     });
 
+    test('matches the supplied \$1,375 weekly 2026 reference paycheck', () {
+      final result = calculator.calculate(
+        input(grossPay: 1375, frequency: PayFrequency.weekly),
+      );
+
+      expect(result.adjustedAnnualWagesCents, 6290000);
+      expect(result.annualTentativeWithholdingCents, 690000);
+      expect(result.selectedTableRow.lowerBoundaryDollars, 57900);
+      expect(result.selectedTableRow.ratePercent, 22);
+      expect(result.finalFederalIncomeTaxWithholdingCents, 13269);
+    });
+
     test('uses the IRS period count and same annual tentative amount', () {
       final expected = <PayFrequency, int>{
         PayFrequency.weekly: 52,
@@ -78,6 +90,76 @@ void main() {
         );
       }
     });
+
+    test(
+      'matches 2026 annual tables for each status, Step 2, and pay period',
+      () {
+        // IRS Pub. 15-T (2026), automated annual percentage tables. Each wage
+        // vector annualizes to $62,400 before W-4 adjustments.
+        const periods = <PayFrequency, int>{
+          PayFrequency.weekly: 52,
+          PayFrequency.biweekly: 26,
+          PayFrequency.semimonthly: 24,
+          PayFrequency.monthly: 12,
+        };
+        const grossByFrequency = <PayFrequency, double>{
+          PayFrequency.weekly: 1200,
+          PayFrequency.biweekly: 2400,
+          PayFrequency.semimonthly: 2600,
+          PayFrequency.monthly: 5200,
+        };
+
+        for (final status in FederalFilingStatus.values) {
+          for (final step2 in [false, true]) {
+            for (final entry in periods.entries) {
+              final result = calculator.calculate(
+                input(
+                  frequency: entry.key,
+                  grossPay: grossByFrequency[entry.key]!,
+                  status: status,
+                  step2: step2,
+                  step3: 2600,
+                  step4a: 1000,
+                  step4b: 500,
+                  step4c: 3.25,
+                ),
+              );
+              // Step 4(a) adds $1,000 to annualized wages; Step 4(b) subtracts
+              // $500. The stated test points remain within their table rows.
+              final step4aAndBAdjustedAnnualCents = switch ((status, step2)) {
+                (FederalFilingStatus.singleOrMarriedFilingSeparately, false) =>
+                  536800,
+                (FederalFilingStatus.singleOrMarriedFilingSeparately, true) =>
+                  946300,
+                (FederalFilingStatus.marriedFilingJointly, false) => 318800,
+                (FederalFilingStatus.marriedFilingJointly, true) => 536800,
+                (FederalFilingStatus.headOfHousehold, false) => 429600,
+                (FederalFilingStatus.headOfHousehold, true) => 763200,
+              };
+              expect(result.payPeriodsPerYear, entry.value);
+              expect(
+                result.adjustedAnnualWagesCents,
+                6240000 +
+                    100000 -
+                    50000 -
+                    (step2 ? 0 : config.standardAdjustmentCents(status)),
+              );
+              expect(
+                result.annualTentativeWithholdingCents,
+                step4aAndBAdjustedAnnualCents,
+              );
+              expect(result.annualStep3CreditCents, 260000);
+              expect(
+                result.finalFederalIncomeTaxWithholdingCents,
+                ((step4aAndBAdjustedAnnualCents - 260000 + entry.value ~/ 2) ~/
+                        entry.value) +
+                    325,
+              );
+            }
+          }
+        }
+      },
+    );
 
     test(
       'Step 2 selects the checkbox table and removes standard adjustment',

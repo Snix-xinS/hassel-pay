@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:paycheck_calculator/main.dart';
 import 'package:paycheck_calculator/paycheck_calculator.dart';
+import 'package:paycheck_calculator/tax/paycheck_tax_service.dart';
+import 'package:paycheck_calculator/tax/payroll_inputs.dart' as tax;
 
 void main() {
   const calculator = PaycheckCalculator();
@@ -47,9 +49,107 @@ void main() {
       test('retains ${period.label} on the result', () {
         final result = calculator.calculate(inputs(payPeriod: period));
         expect(result.payPeriod, period);
-        expect(result.grossPay, 800);
+        expect(
+          result.regularHours,
+          closeTo(40 * period.weeklyHoursMultiplier, 0.000001),
+        );
+        expect(
+          result.grossPay,
+          closeTo(800 * period.weeklyHoursMultiplier, 0.000001),
+        );
       });
     }
+
+    test('converts weekly baseline hours into each actual paycheck', () {
+      final expectedRegularGross = <PayPeriod, double>{
+        PayPeriod.weekly: 1000,
+        PayPeriod.biweekly: 2000,
+        PayPeriod.semimonthly: 2166.67,
+        PayPeriod.monthly: 4333.33,
+      };
+      final expectedOvertimeGross = <PayPeriod, double>{
+        PayPeriod.weekly: 375,
+        PayPeriod.biweekly: 750,
+        PayPeriod.semimonthly: 812.50,
+        PayPeriod.monthly: 1625,
+      };
+      final expectedGross = <PayPeriod, double>{
+        PayPeriod.weekly: 1375,
+        PayPeriod.biweekly: 2750,
+        PayPeriod.semimonthly: 2979.17,
+        PayPeriod.monthly: 5958.33,
+      };
+
+      for (final period in PayPeriod.values) {
+        final regular = calculator.calculate(
+          inputs(hourlyRate: 25, payPeriod: period),
+        );
+        expect(regular.grossPay, closeTo(expectedRegularGross[period]!, 0.005));
+
+        final withOvertime = calculator.calculate(
+          inputs(hourlyRate: 25, overtimeHours: 10, payPeriod: period),
+        );
+        expect(
+          withOvertime.regularPay,
+          closeTo(expectedRegularGross[period]!, 0.005),
+        );
+        expect(
+          withOvertime.overtimePay,
+          closeTo(expectedOvertimeGross[period]!, 0.005),
+        );
+        expect(withOvertime.grossPay, closeTo(expectedGross[period]!, 0.005));
+        expect(
+          withOvertime.overtimeHours,
+          closeTo(10 * 52 / period.payPeriodsPerYear, 0.000001),
+        );
+      }
+    });
+
+    test(
+      'tax service receives gross wages for the selected paycheck period',
+      () {
+        const taxService = PaycheckTaxService();
+        const expectedGrossCents = <PayPeriod, int>{
+          PayPeriod.weekly: 137500,
+          PayPeriod.biweekly: 275000,
+          PayPeriod.semimonthly: 297917,
+          PayPeriod.monthly: 595833,
+        };
+
+        for (final period in PayPeriod.values) {
+          final paycheck = calculator.calculate(
+            inputs(hourlyRate: 25, overtimeHours: 10, payPeriod: period),
+          );
+          final taxResult = taxService.calculate(
+            tax.PayrollInputs.fromDollars(
+              grossPay: paycheck.grossPay,
+              filingStatus:
+                  tax.FederalFilingStatus.singleOrMarriedFilingSeparately,
+              payFrequency: switch (period) {
+                PayPeriod.weekly => tax.PayFrequency.weekly,
+                PayPeriod.biweekly => tax.PayFrequency.biweekly,
+                PayPeriod.semimonthly => tax.PayFrequency.semimonthly,
+                PayPeriod.monthly => tax.PayFrequency.monthly,
+              },
+              state: tax.StateCode.texas,
+              ytdSocialSecurityWages: 0,
+              ytdMedicareWages: 0,
+            ),
+          );
+
+          expect(taxResult.grossPayCents, expectedGrossCents[period]);
+          expect(
+            taxResult.socialSecurityCents,
+            (taxResult.grossPayCents * 620 + 5000) ~/ 10000,
+          );
+          expect(
+            taxResult.medicareCents,
+            (taxResult.grossPayCents * 145 + 5000) ~/ 10000,
+          );
+          expect(taxResult.stateIncomeTaxCents, 0);
+        }
+      },
+    );
 
     test(
       'rejects negative values, non-finite values, and invalid multipliers',
