@@ -211,15 +211,14 @@ void main() {
     await tester.ensureVisible(find.text('Calculate Pay'));
     await tester.tap(find.text('Calculate Pay'));
     await tester.pumpAndSettle();
-    expect(find.text('GROSS PAY - WEEKLY'), findsOneWidget);
-    expect(find.text('\$1100.00'), findsNWidgets(3));
+    expect(find.text('Pay breakdown'), findsOneWidget);
+    expect(find.text('\$1100.00'), findsNWidgets(2));
 
     await tester.ensureVisible(find.text('Clear'));
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
-    expect(find.text('GROSS PAY - WEEKLY'), findsOneWidget);
-    expect(find.text('Pay Breakdown'), findsOneWidget);
-    expect(find.text('Before taxes and deductions'), findsOneWidget);
+    expect(find.text('Your estimate will appear here'), findsOneWidget);
+    expect(find.text('Your estimated paycheck'), findsNothing);
     expect(
       tester
           .widget<EditableText>(find.byType(EditableText).at(0))
@@ -241,7 +240,14 @@ void main() {
           .text,
       '',
     );
-    expect(find.text('\$0.00'), findsNWidgets(4));
+    expect(find.text('\$0.00'), findsNothing);
+    expect(
+      tester
+          .widget<EditableText>(find.byType(EditableText).at(3))
+          .controller
+          .text,
+      '1.5',
+    );
   });
 
   testWidgets('Texas is the default state and Clear restores it', (
@@ -256,7 +262,7 @@ void main() {
     await tester.ensureVisible(find.text('Calculate Pay'));
     await tester.tap(find.text('Calculate Pay'));
     await tester.pumpAndSettle();
-    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsOneWidget);
+    expect(find.text('Your estimated paycheck'), findsOneWidget);
     expect(find.text('ESTIMATED TAKE-HOME'), findsOneWidget);
     expect(
       find.textContaining('Estimated take-home unavailable'),
@@ -266,7 +272,7 @@ void main() {
     await tester.ensureVisible(find.text('Clear'));
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
-    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
+    expect(find.text('Your estimated paycheck'), findsNothing);
     expect(find.text('Texas'), findsOneWidget);
   });
 
@@ -278,6 +284,35 @@ void main() {
     expect(find.byTooltip('Switch to dark theme'), findsNothing);
   });
 
+  testWidgets(
+    'phone layout explains weekly hours and shows results without overflow',
+    (tester) async {
+      tester.view.physicalSize = const Size(360, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.resetPhysicalSize);
+      addTearDown(tester.view.resetDevicePixelRatio);
+
+      await tester.pumpWidget(const PaycheckCalculatorApp());
+      expect(find.text('Regular hours per week'), findsOneWidget);
+      expect(find.text('Overtime hours per week'), findsOneWidget);
+      expect(
+        find.textContaining('adjust them for the selected pay period'),
+        findsOneWidget,
+      );
+      expect(find.text('Your estimate will appear here'), findsOneWidget);
+
+      await tester.enterText(find.byType(EditableText).at(0), '25');
+      await tester.enterText(find.byType(EditableText).at(1), '40');
+      await tester.enterText(find.byType(EditableText).at(2), '10');
+      await tester.ensureVisible(find.text('Calculate Pay'));
+      await tester.tap(find.text('Calculate Pay'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Your estimated paycheck'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
   testWidgets('qualified overtime controls invalidate and display estimate', (
     tester,
   ) async {
@@ -285,57 +320,51 @@ void main() {
     await tester.enterText(find.byType(EditableText).at(0), '25');
     await tester.enterText(find.byType(EditableText).at(1), '40');
     await tester.enterText(find.byType(EditableText).at(2), '10');
-    await tester.ensureVisible(find.text('Treat overtime as FLSA-qualified'));
-    await tester.tap(find.text('Treat overtime as FLSA-qualified'));
-    await tester.pumpAndSettle();
     await tester.ensureVisible(
-      find.text('W-4 adjustments and payroll details'),
+      find.text('Estimate possible overtime deduction'),
     );
-    await tester.tap(find.text('W-4 adjustments and payroll details'));
+    await tester.tap(find.text('Estimate possible overtime deduction'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Optional W-4 details'));
+    await tester.tap(find.text('Optional W-4 details'));
     await tester.pumpAndSettle();
     final magiField = find.byWidgetPredicate(
       (widget) =>
           widget is TextField &&
           widget.decoration?.labelText ==
-              'Estimated 2026 MAGI for overtime phaseout',
+              'Estimated income for 2026 overtime limit',
     );
     await tester.ensureVisible(magiField);
     await tester.enterText(magiField, '50000');
     await tester.ensureVisible(find.text('Calculate Pay'));
     await tester.tap(find.text('Calculate Pay'));
     await tester.pumpAndSettle();
-    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsOneWidget);
+    expect(find.text('Your estimated paycheck'), findsOneWidget);
+    expect(find.text('Potential overtime premium this check'), findsOneWidget);
+    expect(find.text('Estimated overtime deduction this year'), findsOneWidget);
     expect(
-      find.text('Potential qualified overtime (this check)'),
-      findsOneWidget,
-    );
-    expect(
-      find.text('Qualified overtime Step 4(b) estimate (annual)'),
-      findsOneWidget,
-    );
-    expect(
-      find.textContaining('this paycheck amount is not automatically assumed'),
+      find.textContaining('does not lower Social Security or Medicare'),
       findsOneWidget,
     );
     await tester.ensureVisible(find.text('How we estimated this'));
     await tester.tap(find.text('How we estimated this'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('overtime being required under'),
+      find.textContaining('Only overtime that meets federal rules'),
       findsOneWidget,
     );
 
     await tester.enterText(magiField, '60000');
     await tester.pumpAndSettle();
-    expect(find.text('TAX & TAKE-HOME ESTIMATE'), findsNothing);
+    expect(find.text('Your estimated paycheck'), findsNothing);
 
     await tester.ensureVisible(find.text('Clear'));
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
-    expect(find.text('Treat overtime as FLSA-qualified'), findsOneWidget);
+    expect(find.text('Estimate possible overtime deduction'), findsOneWidget);
     final switchControl = tester.widget<SwitchListTile>(
       find.ancestor(
-        of: find.text('Treat overtime as FLSA-qualified'),
+        of: find.text('Estimate possible overtime deduction'),
         matching: find.byType(SwitchListTile),
       ),
     );
